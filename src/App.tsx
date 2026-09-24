@@ -1,9 +1,89 @@
-import { useState, useMemo } from 'react';
-import { leads, industryStats, cityStats, Lead } from './data/leads';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { leads as seedLeads, Lead } from './data/leads';
 
-const getCompanyKey = (lead: Lead) => `${lead.company}|${lead.website}|${lead.phone}`.toLowerCase();
+const DEFAULT_FUNCTION_URL = 'https://udojokhtxodkxtoisbxi.supabase.co/functions/v1/parse-leads';
+const DEFAULT_ANON_KEY = 'sb_publishable_ZjkPYwxtkmtRQyowiOysIg_1rlImAra';
+const backendUrl = ((import.meta.env.VITE_SUPABASE_FUNCTION_URL as string | undefined) || DEFAULT_FUNCTION_URL).replace(/\/$/, '');
+const backendKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || DEFAULT_ANON_KEY;
+
+type LiveLeadRow = Record<string, unknown> & { raw_data?: Record<string, unknown> };
+
+const getCompanyKey = (lead: Lead) => `${lead.company}|${lead.website}|${lead.phone}|${lead.city}`.toLowerCase();
+
+const textValue = (value: unknown, fallback = '') => String(value ?? fallback).trim();
+const numberValue = (value: unknown, fallback = 0) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+const normalizeWebsiteStatus = (value: unknown, hasWebsite: boolean): Lead['websiteStatus'] => {
+  const status = textValue(value).toUpperCase();
+  const allowed: Lead['websiteStatus'][] = ['NO WEBSITE', 'VERY OLD', 'OLD', 'AVERAGE', 'GOOD', 'EXCELLENT', 'BROKEN'];
+  return allowed.includes(status as Lead['websiteStatus']) ? status as Lead['websiteStatus'] : (hasWebsite ? 'AVERAGE' : 'NO WEBSITE');
+};
+
+const normalizePriority = (value: unknown, score: number): Lead['priority'] => {
+  const priority = textValue(value).toUpperCase();
+  if (priority === 'A+' || priority === 'A' || priority === 'B' || priority === 'C') return priority;
+  return score >= 80 ? 'A+' : score >= 70 ? 'A' : 'B';
+};
+
+const normalizeLeadStatus = (value: unknown): Lead['leadStatus'] => {
+  const status = textValue(value).toUpperCase();
+  const allowed: Lead['leadStatus'][] = ['NEW', 'VERIFIED', 'READY_TO_CONTACT', 'CONTACTED', 'REPLIED', 'INTERESTED', 'MEETING', 'PROPOSAL', 'WON', 'LOST', 'DO_NOT_CONTACT'];
+  return allowed.includes(status as Lead['leadStatus']) ? status as Lead['leadStatus'] : 'NEW';
+};
+
+const mapLiveLead = (row: LiveLeadRow, fallbackId: number): Lead => {
+  const raw = row.raw_data && typeof row.raw_data === 'object' ? row.raw_data : {};
+  const field = (dbName: string, rawName: string, fallback = '') => row[dbName] ?? raw[rawName] ?? fallback;
+  const company = textValue(field('company', 'Company')) || 'Без названия';
+  const website = textValue(field('website', 'Website'));
+  const opportunityScore = numberValue(field('opportunity_score', 'Opportunity Score'));
+  const idCandidate = numberValue(raw.ID ?? raw.id, fallbackId);
+
+  return {
+    id: idCandidate || fallbackId,
+    company,
+    industry: textValue(field('industry', 'Industry'), 'Не указано'),
+    city: textValue(field('city', 'City'), 'Не указано'),
+    website,
+    websiteStatus: normalizeWebsiteStatus(field('website_status', 'Website Status'), Boolean(website)),
+    phone: textValue(field('phone', 'Phone')),
+    email: textValue(field('email', 'Email')),
+    whatsapp: textValue(field('whatsapp', 'WhatsApp')),
+    telegram: textValue(field('telegram', 'Telegram')),
+    vk: textValue(field('vk', 'VK')),
+    address: textValue(field('address', 'Address')),
+    source: textValue(field('source_url', 'Source') || field('source', 'source_url')),
+    websiteNeedScore: numberValue(field('website_need_score', 'Website Need Score')),
+    salesPotential: numberValue(field('sales_potential', 'Sales Potential')),
+    businessActivity: numberValue(field('business_activity', 'Business Activity')),
+    opportunityScore,
+    priority: normalizePriority(field('priority', 'Priority'), opportunityScore),
+    mainProblem: textValue(field('main_problem', 'Main Problem')),
+    whyThisLead: textValue(field('why_this_lead', 'Why This Lead')),
+    suggestedImprovement: textValue(field('suggested_improvement', 'Suggested Improvement')),
+    firstMessage: textValue(field('first_message', 'First Message')),
+    followUp1: textValue(field('follow_up_1', 'Follow-up 1')),
+    followUp2: textValue(field('follow_up_2', 'Follow-up 2')),
+    verificationDate: textValue(field('verification_date', 'Verification Date')) || new Date().toISOString().slice(0, 10),
+    leadStatus: normalizeLeadStatus(field('lead_status', 'Lead Status')),
+    emailQuality: (textValue(field('email_quality', 'Email Quality'), 'MEDIUM').toUpperCase() as Lead['emailQuality']),
+    verification: (textValue(field('verification', 'Verification'), 'LOW').toUpperCase() as Lead['verification']),
+    salesAngle: textValue(field('sales_angle', 'Sales Angle')),
+    siteStructure: textValue(field('site_structure', 'Site Structure')),
+  };
+};
+
+const mergeLeads = (current: Lead[], incoming: Lead[]) => {
+  const byKey = new Map(current.map(lead => [getCompanyKey(lead), lead]));
+  incoming.forEach(lead => byKey.set(getCompanyKey(lead), lead));
+  return [...byKey.values()];
+};
 
 function App() {
+  const [leads, setLeads] = useState<Lead[]>(seedLeads);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'top20' | 'report'>('dashboard');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [filterPriority, setFilterPriority] = useState<string>('all');
@@ -17,18 +97,35 @@ function App() {
   const [parserProgress, setParserProgress] = useState(0);
   const [parserStage, setParserStage] = useState('');
   const [parserResult, setParserResult] = useState<number | null>(null);
-  const [parserLimit, setParserLimit] = useState('50');
+  const [parserLimit, setParserLimit] = useState('10000');
   const [parserCity, setParserCity] = useState('all');
   const [parserIndustry, setParserIndustry] = useState('all');
   const [parsedCompanyKeys, setParsedCompanyKeys] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem('parsedCompanyKeysV2');
+      const saved = localStorage.getItem('parsedCompanyKeysV3');
       if (saved) return JSON.parse(saved);
-      // The 50 records already shown in the dashboard came from the initial parsing session.
-      // Mark them as consumed before the first new run so they cannot be offered again.
-      return leads.map(getCompanyKey);
-    } catch { return leads.map(getCompanyKey); }
+      // Seed records are already present in the dashboard and must not be offered by the local fallback parser.
+      return seedLeads.map(getCompanyKey);
+    } catch { return seedLeads.map(getCompanyKey); }
   });
+
+  const refreshLiveLeads = useCallback(async () => {
+    try {
+      const response = await fetch(`${backendUrl}?limit=10000`, {
+        headers: { apikey: backendKey, Authorization: `Bearer ${backendKey}` },
+      });
+      if (!response.ok) throw new Error(`Live leads request failed: ${response.status}`);
+      const result = await response.json() as { leads?: LiveLeadRow[] };
+      const incoming = (result.leads ?? []).map((row, index) => mapLiveLead(row, seedLeads.length + index + 1));
+      if (incoming.length) setLeads(current => mergeLeads(current, incoming));
+    } catch (error) {
+      console.warn('Live leads are unavailable; keeping the local seed list.', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshLiveLeads();
+  }, [refreshLiveLeads]);
 
   const filteredLeads = useMemo(() => {
     let result = [...leads];
@@ -57,25 +154,50 @@ function App() {
     });
     
     return result;
-  }, [filterPriority, filterIndustry, filterCity, filterStatus, sortBy, searchQuery]);
+  }, [leads, filterPriority, filterIndustry, filterCity, filterStatus, sortBy, searchQuery]);
 
   const top20 = useMemo(() => {
     return [...leads].sort((a, b) => b.opportunityScore - a.opportunityScore).slice(0, 20);
-  }, []);
+  }, [leads]);
 
   const stats = useMemo(() => {
     const total = leads.length;
     const aPlus = leads.filter(l => l.priority === 'A+').length;
     const a = leads.filter(l => l.priority === 'A').length;
     const b = leads.filter(l => l.priority === 'B').length;
-    const avgOpp = Math.round(leads.reduce((s, l) => s + l.opportunityScore, 0) / total);
-    const avgNeed = Math.round(leads.reduce((s, l) => s + l.websiteNeedScore, 0) / total);
-    const avgSales = Math.round(leads.reduce((s, l) => s + l.salesPotential, 0) / total);
+    const avgOpp = Math.round(leads.reduce((s, l) => s + l.opportunityScore, 0) / Math.max(total, 1));
+    const avgNeed = Math.round(leads.reduce((s, l) => s + l.websiteNeedScore, 0) / Math.max(total, 1));
+    const avgSales = Math.round(leads.reduce((s, l) => s + l.salesPotential, 0) / Math.max(total, 1));
     const noWebsite = leads.filter(l => l.websiteStatus === 'NO WEBSITE').length;
     const veryOld = leads.filter(l => l.websiteStatus === 'VERY OLD').length;
     const old = leads.filter(l => l.websiteStatus === 'OLD').length;
     return { total, aPlus, a, b, avgOpp, avgNeed, avgSales, noWebsite, veryOld, old };
-  }, []);
+  }, [leads]);
+
+  const industryStats = useMemo(() => {
+    const groups = new Map<string, Lead[]>();
+    leads.forEach(lead => groups.set(lead.industry, [...(groups.get(lead.industry) ?? []), lead]));
+    return [...groups.entries()]
+      .map(([industry, group]) => ({
+        industry,
+        count: group.length,
+        avgScore: Math.round(group.reduce((sum, lead) => sum + lead.opportunityScore, 0) / group.length),
+        topPriority: group.filter(lead => lead.priority === 'A+').length,
+      }))
+      .sort((a, b) => b.count - a.count || b.avgScore - a.avgScore);
+  }, [leads]);
+
+  const cityStats = useMemo(() => {
+    const groups = new Map<string, Lead[]>();
+    leads.forEach(lead => groups.set(lead.city, [...(groups.get(lead.city) ?? []), lead]));
+    return [...groups.entries()]
+      .map(([city, group]) => ({
+        city,
+        count: group.length,
+        avgScore: Math.round(group.reduce((sum, lead) => sum + lead.opportunityScore, 0) / group.length),
+      }))
+      .sort((a, b) => b.count - a.count || b.avgScore - a.avgScore);
+  }, [leads]);
 
   const industries = [...new Set(leads.map(l => l.industry))];
   const cities = [...new Set(leads.map(l => l.city))];
@@ -94,22 +216,22 @@ function App() {
       [84, 'Lead scoring и дедупликация'],
       [100, 'Формирование результата и рекомендаций'],
     ] as const;
-    const backendUrl = (import.meta.env.VITE_SUPABASE_FUNCTION_URL as string | undefined)
-      || 'https://udojokhtxodkxtoisbxi.supabase.co/functions/v1/smooth-endpoiparse-leadsparse-leadsnt';
-    const backendKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)
-      || 'sb_publishable_ZjkPYwxtkmtRQyowiOysIg_1rlImAra';
     if (backendUrl && backendKey) {
       try {
         setParserStage('Запрос к live-источникам Google, 2ГИС и Яндекс');
+        const limit = Math.max(1, Math.min(10000, Number(parserLimit) || 10000));
         const response = await fetch(backendUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', apikey: backendKey, Authorization: `Bearer ${backendKey}` },
-          body: JSON.stringify({ city: parserCity === 'all' ? undefined : parserCity, industry: parserIndustry === 'all' ? undefined : parserIndustry, limit: Math.max(1, Math.min(1000, Number(parserLimit) || 50)) }),
+          body: JSON.stringify({ city: parserCity === 'all' ? undefined : parserCity, industry: parserIndustry === 'all' ? undefined : parserIndustry, limit }),
         });
         if (!response.ok) throw new Error('Backend parser returned an error');
-        const result = await response.json() as { found?: number };
+        const result = await response.json() as { found?: number; leads?: LiveLeadRow[] };
+        const incoming = (result.leads ?? []).map((row, index) => mapLiveLead(row, leads.length + index + 1));
+        if (incoming.length) setLeads(current => mergeLeads(current, incoming));
+        await refreshLiveLeads();
         setParserProgress(100);
-        setParserStage('Готово: новые компании сохранены с дедупликацией');
+        setParserStage('Готово: новые компании добавлены в дашборд');
         setParserResult(Number(result.found) || 0);
         setParserRunning(false);
         return;
@@ -122,7 +244,7 @@ function App() {
       setParserProgress(progress);
       setParserStage(stage);
       if (progress === 100) {
-        const limit = Math.max(1, Math.min(1000, Number(parserLimit) || 50));
+        const limit = Math.max(1, Math.min(10000, Number(parserLimit) || 10000));
         const available = leads.filter(l =>
           !parsedCompanyKeys.includes(getCompanyKey(l)) &&
           (parserCity === 'all' || l.city === parserCity) &&
@@ -131,7 +253,7 @@ function App() {
         const selected = available.slice(0, limit);
         const nextKeys = [...parsedCompanyKeys, ...selected.map(getCompanyKey)];
         setParsedCompanyKeys(nextKeys);
-        localStorage.setItem('parsedCompanyKeysV2', JSON.stringify(nextKeys));
+        localStorage.setItem('parsedCompanyKeysV3', JSON.stringify(nextKeys));
         setParserResult(selected.length);
         setParserRunning(false);
       }
@@ -825,10 +947,10 @@ function App() {
                   </select>
                 </label>
                 <label className="text-sm font-medium text-gray-700">Лимит лидов
-                  <input type="number" min="1" max="1000" value={parserLimit} onChange={e => setParserLimit(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 font-normal" />
+                  <input type="number" min="1" max="10000" value={parserLimit} onChange={e => setParserLimit(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 font-normal" />
                 </label>
               </div>
-              <p className="mt-4 text-xs text-gray-500">Уже выбранные компании автоматически исключаются по названию, сайту и телефону. В истории: {parsedCompanyKeys.length}. В текущем встроенном наборе всего {leads.length} компаний; для выгрузки больше этого числа потребуется подключить live-источник.</p>
+              <p className="mt-4 text-xs text-gray-500">Уже выбранные компании автоматически исключаются по названию, сайту, телефону и городу. В истории: {parsedCompanyKeys.length}. Лимит одной сессии — до 10 000 компаний.</p>
             </>}
 
             {parserRunning && <div className="mt-7">
@@ -844,7 +966,7 @@ function App() {
             </div>}
 
             {!parserRunning && parserResult === null && <div className="mt-6 flex items-center justify-between gap-3">
-              <p className="text-xs text-gray-500">Сейчас запуск работает по загруженному набору данных. Live-источники подключаются через backend/API.</p>
+              <p className="text-xs text-gray-500">Запуск обращается к backend/API, сохраняет новые компании и сразу добавляет их в текущий список. Если live-источник недоступен, используется локальный набор.</p>
               <button onClick={runParser} className="shrink-0 rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white hover:bg-indigo-700">Запустить</button>
             </div>}
           </div>

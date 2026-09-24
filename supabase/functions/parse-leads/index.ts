@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 type ParseRequest = { city?: string; industry?: string; limit?: number; csvRows?: Record<string, string>[] };
@@ -46,13 +46,22 @@ async function fetchYandex(city: string, industry: string) {
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
-  if (request.method !== 'POST') return json({ error: 'Use POST' }, 405);
+  if (request.method !== 'GET' && request.method !== 'POST') return json({ error: 'Use GET or POST' }, 405);
   try {
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    if (request.method === 'GET') {
+      const requestedLimit = Number(new URL(request.url).searchParams.get('limit')) || 10000;
+      const limit = Math.max(1, Math.min(10000, requestedLimit));
+      const { data: leads, error } = await supabase.from('leads').select('*').order('parsed_at', { ascending: false }).limit(limit);
+      if (error) throw error;
+      return json({ leads: leads ?? [] });
+    }
+
     const payload = await request.json() as ParseRequest;
     const city = clean(payload.city) || 'Москва';
     const industry = clean(payload.industry) || 'B2B-компании';
-    const limit = Math.max(1, Math.min(1000, Number(payload.limit) || 50));
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const limit = Math.max(1, Math.min(10000, Number(payload.limit) || 10000));
     const { data: run, error: runError } = await supabase.from('parser_runs').insert({ city, industry, requested_limit: limit, status: 'running' }).select().single();
     if (runError) throw runError;
     const configured = [Deno.env.get('DGIS_API_KEY'), Deno.env.get('YANDEX_MAPS_API_KEY'), Deno.env.get('GOOGLE_PLACES_API_KEY')].some(Boolean);

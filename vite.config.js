@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  base: "/B2B-parser-sites/",
   server: {
     host: "0.0.0.0",
     port: 3000,
