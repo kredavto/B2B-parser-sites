@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { leads, industryStats, cityStats, Lead } from './data/leads';
 
+const getCompanyKey = (lead: Lead) => `${lead.company}|${lead.website}|${lead.phone}`.toLowerCase();
+
 function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'top20' | 'report'>('dashboard');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -19,7 +21,13 @@ function App() {
   const [parserCity, setParserCity] = useState('all');
   const [parserIndustry, setParserIndustry] = useState('all');
   const [parsedCompanyKeys, setParsedCompanyKeys] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('parsedCompanyKeys') || '[]'); } catch { return []; }
+    try {
+      const saved = localStorage.getItem('parsedCompanyKeysV2');
+      if (saved) return JSON.parse(saved);
+      // The 50 records already shown in the dashboard came from the initial parsing session.
+      // Mark them as consumed before the first new run so they cannot be offered again.
+      return leads.map(getCompanyKey);
+    } catch { return leads.map(getCompanyKey); }
   });
 
   const filteredLeads = useMemo(() => {
@@ -73,8 +81,6 @@ function App() {
   const cities = [...new Set(leads.map(l => l.city))];
   const statuses = [...new Set(leads.map(l => l.leadStatus))];
 
-  const companyKey = (lead: Lead) => `${lead.company}|${lead.website}|${lead.phone}`.toLowerCase();
-
   const runParser = () => {
     if (parserRunning) return;
     setParserRunning(true);
@@ -94,14 +100,14 @@ function App() {
       if (progress === 100) {
         const limit = Math.max(1, Math.min(1000, Number(parserLimit) || 50));
         const available = leads.filter(l =>
-          !parsedCompanyKeys.includes(companyKey(l)) &&
+          !parsedCompanyKeys.includes(getCompanyKey(l)) &&
           (parserCity === 'all' || l.city === parserCity) &&
           (parserIndustry === 'all' || l.industry === parserIndustry)
         );
         const selected = available.slice(0, limit);
-        const nextKeys = [...parsedCompanyKeys, ...selected.map(companyKey)];
+        const nextKeys = [...parsedCompanyKeys, ...selected.map(getCompanyKey)];
         setParsedCompanyKeys(nextKeys);
-        localStorage.setItem('parsedCompanyKeys', JSON.stringify(nextKeys));
+        localStorage.setItem('parsedCompanyKeysV2', JSON.stringify(nextKeys));
         setParserResult(selected.length);
         setParserRunning(false);
       }
@@ -798,7 +804,7 @@ function App() {
                   <input type="number" min="1" max="1000" value={parserLimit} onChange={e => setParserLimit(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 font-normal" />
                 </label>
               </div>
-              <p className="mt-4 text-xs text-gray-500">Уже выбранные компании автоматически исключаются по названию, сайту и телефону. Сохранено в этом браузере: {parsedCompanyKeys.length}.</p>
+              <p className="mt-4 text-xs text-gray-500">Уже выбранные компании автоматически исключаются по названию, сайту и телефону. В истории: {parsedCompanyKeys.length}. В текущем встроенном наборе всего {leads.length} компаний; для выгрузки больше этого числа потребуется подключить live-источник.</p>
             </>}
 
             {parserRunning && <div className="mt-7">
@@ -809,7 +815,7 @@ function App() {
 
             {!parserRunning && parserResult !== null && <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
               <div className="font-semibold text-emerald-900">Готово: найдено {parserResult} новых лидов</div>
-              <div className="mt-1 text-sm text-emerald-800">Компании из предыдущих сессий в этот результат не попали.</div>
+              <div className="mt-1 text-sm text-emerald-800">Компании из предыдущих сессий в этот результат не попали. Повторные запуски используют только ещё не выбранные записи.</div>
               <button onClick={() => { setIsParserOpen(false); setActiveTab('leads'); }} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700">Открыть результаты</button>
             </div>}
 
