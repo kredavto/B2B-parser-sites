@@ -1,0 +1,2 @@
+[functions.parse-leads]
+verify_jwt = true
