@@ -8,6 +8,30 @@ const backendKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
 type LiveLeadRow = Record<string, unknown> & { raw_data?: Record<string, unknown> };
 
+type AuditCheck = { name: string; ok: boolean; details: string };
+type SiteAudit = {
+  url: string;
+  finalUrl: string;
+  company: string;
+  status: number;
+  responseTimeMs: number;
+  pageSize: number;
+  opportunityScore: number;
+  websiteNeedScore: number;
+  salesPotential: number;
+  businessActivity: number;
+  priority: string;
+  mainProblem: string;
+  whyThisLead: string;
+  suggestedImprovement: string;
+  firstMessage: string;
+  followUp1: string;
+  followUp2: string;
+  seo: { score: number; checks: AuditCheck[] };
+  geo: { score: number; checks: AuditCheck[] };
+  technical: { https: boolean; hasViewport: boolean; h1Count: number; internalLinks: number; images: number; imagesWithoutAlt: number; hasSitemap: boolean; hasRobots: boolean };
+};
+
 const getCompanyKey = (lead: Lead) => `${lead.company}|${lead.website}|${lead.phone}|${lead.city}`.toLowerCase();
 
 const textValue = (value: unknown, fallback = '') => String(value ?? fallback).trim();
@@ -127,6 +151,11 @@ function App() {
   const [parserLimit, setParserLimit] = useState('10000');
   const [parserCity, setParserCity] = useState('all');
   const [parserIndustry, setParserIndustry] = useState('all');
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
+  const [auditUrl, setAuditUrl] = useState('');
+  const [auditRunning, setAuditRunning] = useState(false);
+  const [auditError, setAuditError] = useState('');
+  const [auditResult, setAuditResult] = useState<SiteAudit | null>(null);
   const [parsedCompanyKeys, setParsedCompanyKeys] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('parsedCompanyKeysV3');
@@ -287,6 +316,32 @@ function App() {
     }, (index + 1) * 650));
   };
 
+  const runSiteAudit = async () => {
+    if (auditRunning) return;
+    const normalizedUrl = auditUrl.trim().match(/^https?:\/\//i) ? auditUrl.trim() : `https://${auditUrl.trim()}`;
+    if (!normalizedUrl || normalizedUrl === 'https://') {
+      setAuditError('Введите URL сайта, например example.ru');
+      return;
+    }
+    setAuditRunning(true);
+    setAuditError('');
+    setAuditResult(null);
+    try {
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: backendKey, Authorization: `Bearer ${backendKey}` },
+        body: JSON.stringify({ action: 'audit', url: normalizedUrl }),
+      });
+      const result = await response.json() as SiteAudit & { error?: string };
+      if (!response.ok || result.error) throw new Error(result.error || `Ошибка аудита: ${response.status}`);
+      setAuditResult(result);
+    } catch (error) {
+      setAuditError(error instanceof Error ? error.message : 'Не удалось выполнить аудит сайта');
+    } finally {
+      setAuditRunning(false);
+    }
+  };
+
   const exportCSV = (data: Lead[], filename: string) => {
     const headers = ['ID','Company','Industry','City','Website','Website Status','Phone','Email','WhatsApp','Telegram','VK','Address','Source','Website Need Score','Sales Potential','Business Activity','Opportunity Score','Priority','Main Problem','Why This Lead','Suggested Improvement','First Message','Follow-up 1','Follow-up 2','Verification Date','Lead Status'];
     const rows = data.map(l => [
@@ -353,9 +408,14 @@ function App() {
               <div className="font-semibold">Новый поиск потенциальных клиентов</div>
               <div className="text-sm text-indigo-200">Поиск → проверка → аудит → скоринг → экспорт</div>
             </div>
-            <button onClick={() => { setParserResult(null); setIsParserOpen(true); }} className="rounded-lg bg-emerald-400 px-4 py-2.5 font-semibold text-emerald-950 shadow-lg hover:bg-emerald-300">
-              🚀 Новый парсинг
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => { setParserResult(null); setIsParserOpen(true); }} className="rounded-lg bg-emerald-400 px-4 py-2.5 font-semibold text-emerald-950 shadow-lg hover:bg-emerald-300">
+                🚀 Новый парсинг
+              </button>
+              <button onClick={() => { setAuditError(''); setAuditResult(null); setIsAuditOpen(true); }} className="rounded-lg bg-sky-300 px-4 py-2.5 font-semibold text-sky-950 shadow-lg hover:bg-sky-200">
+                🔎 Аудит сайта
+              </button>
+            </div>
           </div>
           
           {/* Navigation */}
@@ -1000,6 +1060,18 @@ function App() {
         </div>
       )}
 
+      {isAuditOpen && (
+        <SiteAuditModal
+          url={auditUrl}
+          setUrl={setAuditUrl}
+          running={auditRunning}
+          error={auditError}
+          result={auditResult}
+          onRun={runSiteAudit}
+          onClose={() => { if (!auditRunning) setIsAuditOpen(false); }}
+        />
+      )}
+
       {/* Footer */}
       <footer className="bg-gray-800 text-gray-400 text-center py-6 mt-12">
         <p className="text-sm">AI Lead Generation Pipeline • B2B Web Development • Russia Market</p>
@@ -1069,6 +1141,86 @@ function ScoreCard({ label, score }: { label: string; score: number }) {
     <div className="bg-gray-50 rounded-lg p-4 text-center">
       <div className={`text-3xl font-bold bg-gradient-to-r ${color} bg-clip-text text-transparent`}>{score}</div>
       <div className="text-xs text-gray-500 mt-1">{label}</div>
+    </div>
+  );
+}
+
+function AuditChecks({ checks }: { checks: AuditCheck[] }) {
+  return <div className="space-y-2">{checks.map((check, index) => (
+    <div key={`${check.name}-${index}`} className={`rounded-lg border p-3 ${check.ok ? 'border-emerald-100 bg-emerald-50' : 'border-rose-100 bg-rose-50'}`}>
+      <div className={`font-semibold ${check.ok ? 'text-emerald-800' : 'text-rose-800'}`}>{check.ok ? '✓' : '!' } {check.name}</div>
+      <div className="mt-1 text-xs text-gray-600">{check.details}</div>
+    </div>
+  ))}</div>;
+}
+
+function SiteAuditModal({
+  url,
+  setUrl,
+  running,
+  error,
+  result,
+  onRun,
+  onClose,
+}: {
+  url: string;
+  setUrl: (value: string) => void;
+  running: boolean;
+  error: string;
+  result: SiteAudit | null;
+  onRun: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-4" onClick={() => !running && onClose()}>
+      <div className="mx-auto my-6 w-full max-w-5xl rounded-2xl bg-white p-6 shadow-2xl" onClick={event => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">🔎 Аудит сайта</h2>
+            <p className="mt-1 text-sm text-gray-500">Проверка критериев лида, технической основы, SEO и GEO-готовности для поисковых и AI-систем.</p>
+          </div>
+          {!running && <button onClick={onClose} className="text-2xl leading-none text-gray-400 hover:text-gray-700">×</button>}
+        </div>
+
+        {!result && <div className="mt-6">
+          <label className="text-sm font-semibold text-gray-700">URL сайта
+            <input autoFocus value={url} onChange={event => setUrl(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') onRun(); }} placeholder="https://example.ru" className="mt-2 w-full rounded-lg border px-3 py-3 font-normal outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" disabled={running} />
+          </label>
+          {error && <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
+          {running && <div className="mt-5 rounded-lg bg-indigo-50 p-4 text-sm text-indigo-800">Загружаю сайт и анализирую разметку, метаданные, структурированные данные и GEO-сигналы…</div>}
+          <div className="mt-5 flex justify-end">
+            <button onClick={onRun} disabled={running} className="rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60">{running ? 'Анализирую…' : 'Запустить аудит'}</button>
+          </div>
+        </div>}
+
+        {result && <div className="mt-6 space-y-6">
+          <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border bg-slate-50 p-4">
+            <div><h3 className="text-lg font-bold text-gray-900">{result.company}</h3><a href={result.finalUrl || result.url} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:underline">{result.finalUrl || result.url}</a><div className="mt-1 text-xs text-gray-500">HTTP {result.status} • {result.responseTimeMs} мс • {Math.round(result.pageSize / 1024)} КБ</div></div>
+            <span className="rounded-lg bg-indigo-100 px-3 py-1.5 text-sm font-bold text-indigo-800">Приоритет: {result.priority}</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <ScoreCard label="Потенциал" score={result.opportunityScore} />
+            <ScoreCard label="Потребность в сайте" score={result.websiteNeedScore} />
+            <ScoreCard label="Потенциал продаж" score={result.salesPotential} />
+            <ScoreCard label="SEO" score={result.seo.score} />
+            <ScoreCard label="GEO" score={result.geo.score} />
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <section><h4 className="mb-3 text-lg font-bold text-gray-800">🧭 SEO-анализ · {result.seo.score}/100</h4><AuditChecks checks={result.seo.checks} /></section>
+            <section><h4 className="mb-3 text-lg font-bold text-gray-800">🤖 GEO-анализ · {result.geo.score}/100</h4><AuditChecks checks={result.geo.checks} /></section>
+          </div>
+
+          <div className="rounded-xl border bg-gray-50 p-4"><h4 className="mb-3 font-bold text-gray-800">⚙️ Технические сигналы</h4><div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4"><div>HTTPS: <b>{result.technical.https ? 'да' : 'нет'}</b></div><div>Viewport: <b>{result.technical.hasViewport ? 'да' : 'нет'}</b></div><div>H1: <b>{result.technical.h1Count}</b></div><div>Внутренних ссылок: <b>{result.technical.internalLinks}</b></div><div>Изображений: <b>{result.technical.images}</b></div><div>Без alt: <b>{result.technical.imagesWithoutAlt}</b></div><div>robots.txt: <b>{result.technical.hasRobots ? 'да' : 'нет'}</b></div><div>sitemap.xml: <b>{result.technical.hasSitemap ? 'да' : 'нет'}</b></div></div></div>
+
+          <div className="grid gap-5 md:grid-cols-2"><div className="rounded-xl border border-rose-100 bg-rose-50 p-4"><h4 className="mb-2 font-bold text-rose-800">Главная проблема</h4><p className="text-sm text-rose-900">{result.mainProblem}</p></div><div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><h4 className="mb-2 font-bold text-emerald-800">Рекомендуемое улучшение</h4><p className="text-sm text-emerald-900">{result.suggestedImprovement}</p></div></div>
+
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4"><h4 className="mb-2 font-bold text-indigo-800">💡 Почему это лид</h4><p className="text-sm text-indigo-900">{result.whyThisLead}</p></div>
+          <div className="space-y-3"><div className="rounded-lg border-2 border-indigo-200 p-4"><h4 className="mb-1 font-bold text-indigo-800">✉️ Первое сообщение</h4><p className="text-sm italic text-gray-700">“{result.firstMessage}”</p></div><div className="rounded-lg border p-4"><h4 className="mb-1 font-bold text-gray-700">📨 Повторное сообщение 1</h4><p className="text-sm italic text-gray-600">“{result.followUp1}”</p></div><div className="rounded-lg border p-4"><h4 className="mb-1 font-bold text-gray-700">📨 Повторное сообщение 2</h4><p className="text-sm italic text-gray-600">“{result.followUp2}”</p></div></div>
+          <div className="flex justify-end"><button onClick={() => { setUrl(''); onClose(); }} className="rounded-lg bg-gray-800 px-5 py-2.5 font-semibold text-white hover:bg-gray-900">Закрыть</button></div>
+        </div>}
+      </div>
     </div>
   );
 }
