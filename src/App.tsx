@@ -94,8 +94,10 @@ function App() {
       [84, 'Lead scoring и дедупликация'],
       [100, 'Формирование результата и рекомендаций'],
     ] as const;
-    const backendUrl = import.meta.env.VITE_SUPABASE_FUNCTION_URL as string | undefined;
-    const backendKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+    const backendUrl = (import.meta.env.VITE_SUPABASE_FUNCTION_URL as string | undefined)
+      || 'https://udojokhtxodkxtoisbxi.supabase.co/functions/v1/smooth-endpoiparse-leadsparse-leadsnt';
+    const backendKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)
+      || 'sb_publishable_ZjkPYwxtkmtRQyowiOysIg_1rlImAra';
     if (backendUrl && backendKey) {
       try {
         setParserStage('Запрос к live-источникам Google, 2ГИС и Яндекс');
