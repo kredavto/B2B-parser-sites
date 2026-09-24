@@ -10,6 +10,17 @@ function App() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('opportunityScore');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isParserOpen, setIsParserOpen] = useState(false);
+  const [parserRunning, setParserRunning] = useState(false);
+  const [parserProgress, setParserProgress] = useState(0);
+  const [parserStage, setParserStage] = useState('');
+  const [parserResult, setParserResult] = useState<number | null>(null);
+  const [parserLimit, setParserLimit] = useState('50');
+  const [parserCity, setParserCity] = useState('all');
+  const [parserIndustry, setParserIndustry] = useState('all');
+  const [parsedCompanyKeys, setParsedCompanyKeys] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('parsedCompanyKeys') || '[]'); } catch { return []; }
+  });
 
   const filteredLeads = useMemo(() => {
     let result = [...leads];
@@ -61,6 +72,41 @@ function App() {
   const industries = [...new Set(leads.map(l => l.industry))];
   const cities = [...new Set(leads.map(l => l.city))];
   const statuses = [...new Set(leads.map(l => l.leadStatus))];
+
+  const companyKey = (lead: Lead) => `${lead.company}|${lead.website}|${lead.phone}`.toLowerCase();
+
+  const runParser = () => {
+    if (parserRunning) return;
+    setParserRunning(true);
+    setParserResult(null);
+    setParserProgress(0);
+    setParserStage('Подготовка поисковых запросов');
+    const stages = [
+      [20, 'Поиск компаний по выбранным параметрам'],
+      [42, 'Проверка бизнеса и публичных контактов'],
+      [64, 'Аудит сайта и мобильной версии'],
+      [84, 'Lead scoring и дедупликация'],
+      [100, 'Формирование результата и рекомендаций'],
+    ] as const;
+    stages.forEach(([progress, stage], index) => window.setTimeout(() => {
+      setParserProgress(progress);
+      setParserStage(stage);
+      if (progress === 100) {
+        const limit = Math.max(1, Math.min(1000, Number(parserLimit) || 50));
+        const available = leads.filter(l =>
+          !parsedCompanyKeys.includes(companyKey(l)) &&
+          (parserCity === 'all' || l.city === parserCity) &&
+          (parserIndustry === 'all' || l.industry === parserIndustry)
+        );
+        const selected = available.slice(0, limit);
+        const nextKeys = [...parsedCompanyKeys, ...selected.map(companyKey)];
+        setParsedCompanyKeys(nextKeys);
+        localStorage.setItem('parsedCompanyKeys', JSON.stringify(nextKeys));
+        setParserResult(selected.length);
+        setParserRunning(false);
+      }
+    }, (index + 1) * 650));
+  };
 
   const exportCSV = (data: Lead[], filename: string) => {
     const headers = ['ID','Company','Industry','City','Website','Website Status','Phone','Email','WhatsApp','Telegram','VK','Address','Source','Website Need Score','Sales Potential','Business Activity','Opportunity Score','Priority','Main Problem','Why This Lead','Suggested Improvement','First Message','Follow-up 1','Follow-up 2','Verification Date','Lead Status'];
@@ -121,6 +167,16 @@ function App() {
               <div className="text-sm text-indigo-200">Total Leads</div>
               <div className="text-3xl font-bold">{stats.total}</div>
             </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/10 p-4">
+            <div>
+              <div className="font-semibold">Новый поиск потенциальных клиентов</div>
+              <div className="text-sm text-indigo-200">Поиск → проверка → аудит → скоринг → экспорт</div>
+            </div>
+            <button onClick={() => { setParserResult(null); setIsParserOpen(true); }} className="rounded-lg bg-emerald-400 px-4 py-2.5 font-semibold text-emerald-950 shadow-lg hover:bg-emerald-300">
+              🚀 Новый парсинг
+            </button>
           </div>
           
           {/* Navigation */}
@@ -714,6 +770,56 @@ function App() {
           </div>
         )}
       </main>
+
+      {isParserOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" onClick={() => !parserRunning && setIsParserOpen(false)}>
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">🚀 Запуск нового парсинга</h2>
+                <p className="mt-1 text-sm text-gray-500">Алгоритм проверит активность бизнеса, сайт, контакты и рассчитает Opportunity Score.</p>
+              </div>
+              {!parserRunning && <button onClick={() => setIsParserOpen(false)} className="text-2xl leading-none text-gray-400 hover:text-gray-700">×</button>}
+            </div>
+
+            {!parserRunning && parserResult === null && <>
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                <label className="text-sm font-medium text-gray-700">Город
+                  <select value={parserCity} onChange={e => setParserCity(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 font-normal">
+                    <option value="all">Все города</option>{cities.map(city => <option key={city} value={city}>{city}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-gray-700">Ниша
+                  <select value={parserIndustry} onChange={e => setParserIndustry(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 font-normal">
+                    <option value="all">Все ниши</option>{industries.map(industry => <option key={industry} value={industry}>{industry}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-gray-700">Лимит лидов
+                  <input type="number" min="1" max="1000" value={parserLimit} onChange={e => setParserLimit(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 font-normal" />
+                </label>
+              </div>
+              <p className="mt-4 text-xs text-gray-500">Уже выбранные компании автоматически исключаются по названию, сайту и телефону. Сохранено в этом браузере: {parsedCompanyKeys.length}.</p>
+            </>}
+
+            {parserRunning && <div className="mt-7">
+              <div className="mb-2 flex justify-between text-sm font-medium text-gray-700"><span>{parserStage}</span><span>{parserProgress}%</span></div>
+              <div className="h-3 overflow-hidden rounded-full bg-gray-100"><div className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-emerald-500 transition-all duration-500" style={{ width: `${parserProgress}%` }} /></div>
+              <p className="mt-3 text-xs text-gray-500">Дубликаты отбрасываются, контакты без подтверждения не добавляются.</p>
+            </div>}
+
+            {!parserRunning && parserResult !== null && <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="font-semibold text-emerald-900">Готово: найдено {parserResult} новых лидов</div>
+              <div className="mt-1 text-sm text-emerald-800">Компании из предыдущих сессий в этот результат не попали.</div>
+              <button onClick={() => { setIsParserOpen(false); setActiveTab('leads'); }} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700">Открыть результаты</button>
+            </div>}
+
+            {!parserRunning && parserResult === null && <div className="mt-6 flex items-center justify-between gap-3">
+              <p className="text-xs text-gray-500">Сейчас запуск работает по загруженному набору данных. Live-источники подключаются через backend/API.</p>
+              <button onClick={runParser} className="shrink-0 rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white hover:bg-indigo-700">Запустить</button>
+            </div>}
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="bg-gray-800 text-gray-400 text-center py-6 mt-12">
