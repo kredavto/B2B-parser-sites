@@ -81,7 +81,7 @@ function App() {
   const cities = [...new Set(leads.map(l => l.city))];
   const statuses = [...new Set(leads.map(l => l.leadStatus))];
 
-  const runParser = () => {
+  const runParser = async () => {
     if (parserRunning) return;
     setParserRunning(true);
     setParserResult(null);
@@ -94,6 +94,28 @@ function App() {
       [84, 'Lead scoring и дедупликация'],
       [100, 'Формирование результата и рекомендаций'],
     ] as const;
+    const backendUrl = import.meta.env.VITE_SUPABASE_FUNCTION_URL as string | undefined;
+    const backendKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+    if (backendUrl && backendKey) {
+      try {
+        setParserStage('Запрос к live-источникам Google, 2ГИС и Яндекс');
+        const response = await fetch(backendUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: backendKey, Authorization: `Bearer ${backendKey}` },
+          body: JSON.stringify({ city: parserCity === 'all' ? undefined : parserCity, industry: parserIndustry === 'all' ? undefined : parserIndustry, limit: Math.max(1, Math.min(1000, Number(parserLimit) || 50)) }),
+        });
+        if (!response.ok) throw new Error('Backend parser returned an error');
+        const result = await response.json() as { found?: number };
+        setParserProgress(100);
+        setParserStage('Готово: новые компании сохранены с дедупликацией');
+        setParserResult(Number(result.found) || 0);
+        setParserRunning(false);
+        return;
+      } catch (error) {
+        console.error(error);
+        setParserStage('Live-источник недоступен, использую локальный набор');
+      }
+    }
     stages.forEach(([progress, stage], index) => window.setTimeout(() => {
       setParserProgress(progress);
       setParserStage(stage);
