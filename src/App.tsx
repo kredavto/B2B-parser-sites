@@ -36,17 +36,44 @@ const normalizeLeadStatus = (value: unknown): Lead['leadStatus'] => {
 
 const mapLiveLead = (row: LiveLeadRow, fallbackId: number): Lead => {
   const raw = row.raw_data && typeof row.raw_data === 'object' ? row.raw_data : {};
-  const field = (dbName: string, rawName: string, fallback = '') => row[dbName] ?? raw[rawName] ?? fallback;
+  const field = (dbName: string, rawName: string, fallback: unknown = '') => row[dbName] ?? raw[dbName] ?? raw[rawName] ?? fallback;
   const company = textValue(field('company', 'Company')) || 'Без названия';
+  const industry = textValue(field('industry', 'Industry'), 'Не указано');
+  const city = textValue(field('city', 'City'), 'Не указано');
   const website = textValue(field('website', 'Website'));
-  const opportunityScore = numberValue(field('opportunity_score', 'Opportunity Score'));
+  const hasWebsite = Boolean(website);
+  const defaultWebsiteNeed = hasWebsite ? 72 : 92;
+  const defaultSalesPotential = hasWebsite ? 74 : 68;
+  const defaultBusinessActivity = textValue(field('phone', 'Phone')) || textValue(field('source_url', 'Source')) ? 76 : 60;
+  const websiteNeedScore = numberValue(field('website_need_score', 'Website Need Score', defaultWebsiteNeed), defaultWebsiteNeed);
+  const salesPotential = numberValue(field('sales_potential', 'Sales Potential', defaultSalesPotential), defaultSalesPotential);
+  const businessActivity = numberValue(field('business_activity', 'Business Activity', defaultBusinessActivity), defaultBusinessActivity);
+  const opportunityScore = numberValue(
+    field('opportunity_score', 'Opportunity Score', Math.round(websiteNeedScore * 0.5 + salesPotential * 0.3 + businessActivity * 0.2)),
+    Math.round(websiteNeedScore * 0.5 + salesPotential * 0.3 + businessActivity * 0.2),
+  );
+  const mainProblemFallback = hasWebsite
+    ? `Сайт компании требует проверки и усиления конверсии в заявку для ниши «${industry}»`
+    : `Нет собственного сайта — клиенты из города ${city} могут не находить компанию в поиске`;
+  const whyThisLeadFallback = hasWebsite
+    ? `${company} работает в нише «${industry}» в городе ${city}. Компания уже представлена в открытых источниках, поэтому улучшение сайта может помочь превратить текущий спрос в дополнительные заявки.`
+    : `${company} работает в нише «${industry}» в городе ${city}. Компания найдена в открытых источниках, но собственного сайта в карточке не указано — это заметная точка роста для привлечения клиентов.`;
+  const suggestedImprovementFallback = hasWebsite
+    ? 'Проверить мобильную версию, сделать понятный первый экран, добавить явный призыв к действию, форму заявки и удобный блок контактов.'
+    : 'Создать быстрый сайт с описанием услуг, преимуществами, контактами, картой и заметной кнопкой заявки или звонка.';
+  const firstMessageFallback = hasWebsite
+    ? `Здравствуйте! Посмотрел представление ${company} в открытых источниках. Для компаний в нише «${industry}» сайт должен быстро объяснять предложение и приводить к заявке. Могу показать несколько точек роста для вашего сайта.`
+    : `Здравствуйте! Нашёл ${company} в открытых источниках. Для бизнеса в нише «${industry}» собственный сайт помогает получать клиентов из поиска и сразу показывать услуги, цены и контакты. Могу предложить структуру такого сайта.`;
+  const followUp1Fallback = 'Добрый день! Продублирую предложение по улучшению сайта и привлечению заявок. Если актуально, покажу короткий вариант решения.';
+  const followUp2Fallback = 'Здравствуйте! Если вопрос сайта пока не в приоритете, сохраните контакт — буду рад помочь, когда задача станет актуальной.';
+  const salesAngleFallback = hasWebsite ? 'Увеличение числа заявок через понятный сайт и удобный контакт с компанией' : 'Получение дополнительного спроса из поиска за счёт собственного сайта';
   const idCandidate = numberValue(raw.ID ?? raw.id, fallbackId);
 
   return {
     id: idCandidate || fallbackId,
     company,
-    industry: textValue(field('industry', 'Industry'), 'Не указано'),
-    city: textValue(field('city', 'City'), 'Не указано'),
+    industry,
+    city,
     website,
     websiteStatus: normalizeWebsiteStatus(field('website_status', 'Website Status'), Boolean(website)),
     phone: textValue(field('phone', 'Phone')),
@@ -56,22 +83,22 @@ const mapLiveLead = (row: LiveLeadRow, fallbackId: number): Lead => {
     vk: textValue(field('vk', 'VK')),
     address: textValue(field('address', 'Address')),
     source: textValue(field('source_url', 'Source') || field('source', 'source_url')),
-    websiteNeedScore: numberValue(field('website_need_score', 'Website Need Score')),
-    salesPotential: numberValue(field('sales_potential', 'Sales Potential')),
-    businessActivity: numberValue(field('business_activity', 'Business Activity')),
+    websiteNeedScore,
+    salesPotential,
+    businessActivity,
     opportunityScore,
     priority: normalizePriority(field('priority', 'Priority'), opportunityScore),
-    mainProblem: textValue(field('main_problem', 'Main Problem')),
-    whyThisLead: textValue(field('why_this_lead', 'Why This Lead')),
-    suggestedImprovement: textValue(field('suggested_improvement', 'Suggested Improvement')),
-    firstMessage: textValue(field('first_message', 'First Message')),
-    followUp1: textValue(field('follow_up_1', 'Follow-up 1')),
-    followUp2: textValue(field('follow_up_2', 'Follow-up 2')),
+    mainProblem: textValue(field('main_problem', 'Main Problem', mainProblemFallback), mainProblemFallback),
+    whyThisLead: textValue(field('why_this_lead', 'Why This Lead', whyThisLeadFallback), whyThisLeadFallback),
+    suggestedImprovement: textValue(field('suggested_improvement', 'Suggested Improvement', suggestedImprovementFallback), suggestedImprovementFallback),
+    firstMessage: textValue(field('first_message', 'First Message', firstMessageFallback), firstMessageFallback),
+    followUp1: textValue(field('follow_up_1', 'Follow-up 1', followUp1Fallback), followUp1Fallback),
+    followUp2: textValue(field('follow_up_2', 'Follow-up 2', followUp2Fallback), followUp2Fallback),
     verificationDate: textValue(field('verification_date', 'Verification Date')) || new Date().toISOString().slice(0, 10),
     leadStatus: normalizeLeadStatus(field('lead_status', 'Lead Status')),
     emailQuality: (textValue(field('email_quality', 'Email Quality'), 'MEDIUM').toUpperCase() as Lead['emailQuality']),
     verification: (textValue(field('verification', 'Verification'), 'LOW').toUpperCase() as Lead['verification']),
-    salesAngle: textValue(field('sales_angle', 'Sales Angle')),
+    salesAngle: textValue(field('sales_angle', 'Sales Angle', salesAngleFallback), salesAngleFallback),
     siteStructure: textValue(field('site_structure', 'Site Structure')),
   };
 };

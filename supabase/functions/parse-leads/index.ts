@@ -11,6 +11,92 @@ type ParseRequest = { city?: string; industry?: string; limit?: number; csvRows?
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 const clean = (value: unknown) => String(value ?? '').trim();
 const keyOf = (row: Record<string, unknown>) => [row.company, row.website, row.phone, row.city].map(clean).join('|').toLowerCase();
+const asRecord = (value: unknown): Record<string, unknown> => value && typeof value === 'object' ? value as Record<string, unknown> : {};
+const readValue = (row: Record<string, unknown>, ...names: string[]) => {
+  const raw = asRecord(row.raw_data);
+  for (const name of names) {
+    const value = row[name] ?? raw[name];
+    if (value !== null && value !== undefined && clean(value) !== '') return value;
+  }
+  return undefined;
+};
+const numberValue = (value: unknown, fallback: number) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+const enrichLead = (row: Record<string, unknown>) => {
+  const company = clean(readValue(row, 'company', 'Company')) || 'Без названия';
+  const industry = clean(readValue(row, 'industry', 'Industry')) || 'Не указано';
+  const city = clean(readValue(row, 'city', 'City')) || 'Не указано';
+  const website = clean(readValue(row, 'website', 'Website'));
+  const phone = clean(readValue(row, 'phone', 'Phone'));
+  const sourceUrl = clean(readValue(row, 'source_url', 'Source', 'source')) || 'csv-import';
+  const hasWebsite = Boolean(website);
+  const defaultWebsiteNeed = hasWebsite ? 72 : 92;
+  const defaultSalesPotential = hasWebsite ? 74 : 68;
+  const defaultBusinessActivity = phone || sourceUrl ? 76 : 60;
+  const websiteNeedScore = numberValue(readValue(row, 'website_need_score', 'Website Need Score'), defaultWebsiteNeed);
+  const salesPotential = numberValue(readValue(row, 'sales_potential', 'Sales Potential'), defaultSalesPotential);
+  const businessActivity = numberValue(readValue(row, 'business_activity', 'Business Activity'), defaultBusinessActivity);
+  const opportunityScore = numberValue(readValue(row, 'opportunity_score', 'Opportunity Score'), Math.round(websiteNeedScore * 0.5 + salesPotential * 0.3 + businessActivity * 0.2));
+  const websiteStatus = clean(readValue(row, 'website_status', 'Website Status')).toUpperCase() || (hasWebsite ? 'AVERAGE' : 'NO WEBSITE');
+  const priority = clean(readValue(row, 'priority', 'Priority')).toUpperCase() || (opportunityScore >= 80 ? 'A+' : opportunityScore >= 70 ? 'A' : 'B');
+  const mainProblem = clean(readValue(row, 'main_problem', 'Main Problem')) || (hasWebsite
+    ? `Сайт компании требует проверки и усиления конверсии в заявку для ниши «${industry}»`
+    : `Нет собственного сайта — клиенты из города ${city} могут не находить компанию в поиске`);
+  const whyThisLead = clean(readValue(row, 'why_this_lead', 'Why This Lead')) || (hasWebsite
+    ? `${company} работает в нише «${industry}» в городе ${city}. Компания уже представлена в открытых источниках, поэтому улучшение сайта может помочь превратить текущий спрос в дополнительные заявки.`
+    : `${company} работает в нише «${industry}» в городе ${city}. Компания найдена в открытых источниках, но собственного сайта в карточке не указано — это заметная точка роста для привлечения клиентов.`);
+  const suggestedImprovement = clean(readValue(row, 'suggested_improvement', 'Suggested Improvement')) || (hasWebsite
+    ? 'Проверить мобильную версию, сделать понятный первый экран, добавить явный призыв к действию, форму заявки и удобный блок контактов.'
+    : 'Создать быстрый сайт с описанием услуг, преимуществами, контактами, картой и заметной кнопкой заявки или звонка.');
+  const firstMessage = clean(readValue(row, 'first_message', 'First Message')) || (hasWebsite
+    ? `Здравствуйте! Посмотрел представление ${company} в открытых источниках. Для компаний в нише «${industry}» сайт должен быстро объяснять предложение и приводить к заявке. Могу показать несколько точек роста для вашего сайта.`
+    : `Здравствуйте! Нашёл ${company} в открытых источниках. Для бизнеса в нише «${industry}» собственный сайт помогает получать клиентов из поиска и сразу показывать услуги, цены и контакты. Могу предложить структуру такого сайта.`);
+  const followUp1 = clean(readValue(row, 'follow_up_1', 'Follow-up 1')) || 'Добрый день! Продублирую предложение по улучшению сайта и привлечению заявок. Если актуально, покажу короткий вариант решения.';
+  const followUp2 = clean(readValue(row, 'follow_up_2', 'Follow-up 2')) || 'Здравствуйте! Если вопрос сайта пока не в приоритете, сохраните контакт — буду рад помочь, когда задача станет актуальной.';
+  const salesAngle = clean(readValue(row, 'sales_angle', 'Sales Angle')) || (hasWebsite
+    ? 'Увеличение числа заявок через понятный сайт и удобный контакт с компанией'
+    : 'Получение дополнительного спроса из поиска за счёт собственного сайта');
+  const raw = {
+    ...asRecord(row.raw_data),
+    company, industry, city, website, phone,
+    website_status: websiteStatus,
+    website_need_score: websiteNeedScore,
+    sales_potential: salesPotential,
+    business_activity: businessActivity,
+    opportunity_score: opportunityScore,
+    priority,
+    main_problem: mainProblem,
+    why_this_lead: whyThisLead,
+    suggested_improvement: suggestedImprovement,
+    first_message: firstMessage,
+    follow_up_1: followUp1,
+    follow_up_2: followUp2,
+    sales_angle: salesAngle,
+  };
+
+  return {
+    company,
+    industry,
+    city,
+    website: website || null,
+    website_status: websiteStatus,
+    phone: phone || null,
+    email: clean(readValue(row, 'email', 'Email')) || null,
+    address: clean(readValue(row, 'address', 'Address')) || null,
+    source_url: sourceUrl,
+    website_need_score: websiteNeedScore,
+    sales_potential: salesPotential,
+    business_activity: businessActivity,
+    opportunity_score: opportunityScore,
+    priority,
+    main_problem: mainProblem,
+    raw_data: raw,
+    source_key: keyOf({ company, website, phone, city }),
+  };
+};
 
 async function fetchGoogle(city: string, industry: string) {
   const key = Deno.env.get('GOOGLE_PLACES_API_KEY');
@@ -55,7 +141,7 @@ Deno.serve(async (request) => {
       const limit = Math.max(1, Math.min(10000, requestedLimit));
       const { data: leads, error } = await supabase.from('leads').select('*').order('parsed_at', { ascending: false }).limit(limit);
       if (error) throw error;
-      return json({ leads: leads ?? [] });
+      return json({ leads: (leads ?? []).map((row) => enrichLead(row as Record<string, unknown>)) });
     }
 
     const payload = await request.json() as ParseRequest;
@@ -68,10 +154,11 @@ Deno.serve(async (request) => {
     const csvRows = Array.isArray(payload.csvRows) ? payload.csvRows : [];
     const providerRows = configured ? (await Promise.all([fetch2gis(city, industry), fetchYandex(city, industry), fetchGoogle(city, industry)])).flat() : [];
     const candidates = [...csvRows, ...providerRows].slice(0, limit * 3);
-    const keys = candidates.map(keyOf);
+    const normalizedCandidates = candidates.map((row) => enrichLead(row));
+    const keys = normalizedCandidates.map((row) => row.source_key);
     const { data: existing } = keys.length ? await supabase.from('leads').select('source_key').in('source_key', keys) : { data: [] };
     const existingKeys = new Set((existing ?? []).map((row: { source_key: string }) => row.source_key));
-    const fresh = candidates.filter((row) => !existingKeys.has(keyOf(row))).slice(0, limit).map((row) => ({ ...row, source_key: keyOf(row), source_url: clean(row.source_url) || 'csv-import', raw_data: row }));
+    const fresh = normalizedCandidates.filter((row) => !existingKeys.has(row.source_key)).slice(0, limit);
     if (fresh.length) await supabase.from('leads').insert(fresh);
     await supabase.from('parser_runs').update({ found_count: fresh.length, status: 'completed' }).eq('id', run.id);
     return json({ runId: run.id, requested: limit, found: fresh.length, providers: { dgis: Boolean(Deno.env.get('DGIS_API_KEY')), yandex: Boolean(Deno.env.get('YANDEX_MAPS_API_KEY')), google: Boolean(Deno.env.get('GOOGLE_PLACES_API_KEY')) }, leads: fresh });
