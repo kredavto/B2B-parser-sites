@@ -159,12 +159,12 @@ function App() {
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-3">
                 <span className="text-4xl">🎯</span>
-                AI Lead Generation Pipeline
+                AI-пайплайн генерации лидов
               </h1>
-              <p className="text-indigo-200 mt-1">B2B Web Development — Russia Market Research</p>
+              <p className="text-indigo-200 mt-1">Разработка B2B-сайтов — исследование рынка России</p>
             </div>
             <div className="text-right">
-              <div className="text-sm text-indigo-200">Total Leads</div>
+              <div className="text-sm text-indigo-200">Всего лидов</div>
               <div className="text-3xl font-bold">{stats.total}</div>
             </div>
           </div>
@@ -182,10 +182,10 @@ function App() {
           {/* Navigation */}
           <nav className="mt-6 flex gap-1">
             {[
-              { id: 'dashboard', label: '📊 Dashboard', },
-              { id: 'leads', label: '📋 All Leads' },
-              { id: 'top20', label: '🏆 Top 20' },
-              { id: 'report', label: '📄 Report' },
+              { id: 'dashboard', label: '📊 Дашборд', },
+              { id: 'leads', label: '📋 Все лиды' },
+              { id: 'top20', label: '🏆 Топ-20' },
+              { id: 'report', label: '📄 Отчёт' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -209,19 +209,19 @@ function App() {
           <div className="space-y-8">
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <KPICard label="Total Leads" value={stats.total} icon="📊" color="bg-indigo-50 border-indigo-200" />
-              <KPICard label="A+ Priority" value={stats.aPlus} icon="🔥" color="bg-red-50 border-red-200" />
-              <KPICard label="A Priority" value={stats.a} icon="⭐" color="bg-orange-50 border-orange-200" />
-              <KPICard label="Avg Opportunity" value={stats.avgOpp} icon="📈" color="bg-green-50 border-green-200" suffix="/100" />
-              <KPICard label="No Website" value={stats.noWebsite} icon="🚫" color="bg-purple-50 border-purple-200" />
-              <KPICard label="Very Old Sites" value={stats.veryOld + stats.old} icon="🕐" color="bg-yellow-50 border-yellow-200" />
+              <KPICard label="Всего лидов" value={stats.total} icon="📊" color="bg-indigo-50 border-indigo-200" />
+              <KPICard label="Приоритет A+" value={stats.aPlus} icon="🔥" color="bg-red-50 border-red-200" />
+              <KPICard label="Приоритет A" value={stats.a} icon="⭐" color="bg-orange-50 border-orange-200" />
+              <KPICard label="Средний потенциал" value={stats.avgOpp} icon="📈" color="bg-green-50 border-green-200" suffix="/100" />
+              <KPICard label="Без сайта" value={stats.noWebsite} icon="🚫" color="bg-purple-50 border-purple-200" />
+              <KPICard label="Старые сайты" value={stats.veryOld + stats.old} icon="🕐" color="bg-yellow-50 border-yellow-200" />
             </div>
 
             {/* Charts Row */}
             <div className="grid md:grid-cols-2 gap-6">
               {/* Industry Stats */}
               <div className="bg-white rounded-xl shadow-md p-6 border">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Leads by Industry</h3>
+                <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Лиды по нишам</h3>
                 <div className="space-y-3">
                   {industryStats.map(ind => (
                     <div key={ind.industry} className="flex items-center gap-3">
@@ -235,7 +235,7 @@ function App() {
                         </div>
                       </div>
                       <div className="text-sm font-medium text-gray-500 w-16 text-right">
-                        Avg: {ind.avgScore}
+                        Среднее: {ind.avgScore}
                       </div>
                     </div>
                   ))}
@@ -244,7 +244,7 @@ function App() {
 
               {/* City Stats */}
               <div className="bg-white rounded-xl shadow-md p-6 border">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">🏙️ Leads by City</h3>
+                <h3 className="text-lg font-bold text-gray-800 mb-4">🏙️ Лиды по городам</h3>
                 <div className="space-y-3">
                   {cityStats.map(c => (
                     <div key={c.city} className="flex items-center gap-3">
@@ -258,7 +258,7 @@ function App() {
                         </div>
                       </div>
                       <div className="text-sm font-medium text-gray-500 w-16 text-right">
-                        Avg: {c.avgScore}
+                        Среднее: {c.avgScore}
                       </div>
                     </div>
                   ))}
@@ -269,7 +269,7 @@ function App() {
             {/* Priority Distribution */}
             <div className="grid md:grid-cols-3 gap-6">
               <div className="bg-white rounded-xl shadow-md p-6 border">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">🎯 Priority Distribution</h3>
+                <h3 className="text-lg font-bold text-gray-800 mb-4">🎯 Распределение приоритетов</h3>
                 <div className="space-y-4">
                   <PriorityBar label="A+" count={stats.aPlus} total={stats.total} color="bg-red-500" />
                   <PriorityBar label="A" count={stats.a} total={stats.total} color="bg-orange-500" />
@@ -278,29 +278,29 @@ function App() {
               </div>
 
               <div className="bg-white rounded-xl shadow-md p-6 border">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">🌐 Website Status</h3>
+                <h3 className="text-lg font-bold text-gray-800 mb-4">🌐 Состояние сайтов</h3>
                 <div className="space-y-3">
-                  <StatusRow label="No Website" count={stats.noWebsite} total={stats.total} color="bg-red-400" />
-                  <StatusRow label="Very Old" count={stats.veryOld} total={stats.total} color="bg-orange-400" />
-                  <StatusRow label="Old" count={stats.old} total={stats.total} color="bg-yellow-400" />
-                  <StatusRow label="Average" count={leads.filter(l => l.websiteStatus === 'AVERAGE').length} total={stats.total} color="bg-blue-400" />
-                  <StatusRow label="Good" count={leads.filter(l => l.websiteStatus === 'GOOD').length} total={stats.total} color="bg-green-400" />
+                  <StatusRow label="Нет сайта" count={stats.noWebsite} total={stats.total} color="bg-red-400" />
+                  <StatusRow label="Очень старый" count={stats.veryOld} total={stats.total} color="bg-orange-400" />
+                  <StatusRow label="Старый" count={stats.old} total={stats.total} color="bg-yellow-400" />
+                  <StatusRow label="Средний" count={leads.filter(l => l.websiteStatus === 'AVERAGE').length} total={stats.total} color="bg-blue-400" />
+                  <StatusRow label="Хороший" count={leads.filter(l => l.websiteStatus === 'GOOD').length} total={stats.total} color="bg-green-400" />
                 </div>
               </div>
 
               <div className="bg-white rounded-xl shadow-md p-6 border">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">📈 Average Scores</h3>
+                <h3 className="text-lg font-bold text-gray-800 mb-4">📈 Средние оценки</h3>
                 <div className="space-y-4">
-                  <ScoreCircle label="Opportunity" score={stats.avgOpp} />
-                  <ScoreCircle label="Website Need" score={stats.avgNeed} />
-                  <ScoreCircle label="Sales Potential" score={stats.avgSales} />
+                  <ScoreCircle label="Потенциал" score={stats.avgOpp} />
+                  <ScoreCircle label="Потребность в сайте" score={stats.avgNeed} />
+                  <ScoreCircle label="Потенциал продаж" score={stats.avgSales} />
                 </div>
               </div>
             </div>
 
             {/* Pipeline Steps */}
             <div className="bg-white rounded-xl shadow-md p-6 border">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">🔄 Pipeline Status</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-4">🔄 Статус воронки</h3>
               <div className="flex flex-wrap gap-3">
                 {['NEW', 'VERIFIED', 'READY_TO_CONTACT', 'CONTACTED'].map(status => {
                   const count = leads.filter(l => l.leadStatus === status).length;
@@ -323,9 +323,9 @@ function App() {
             {/* Quick Top 5 */}
             <div className="bg-white rounded-xl shadow-md p-6 border">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-800">🔥 Top 5 Opportunities</h3>
+                <h3 className="text-lg font-bold text-gray-800">🔥 Топ-5 возможностей</h3>
                 <button onClick={() => setActiveTab('top20')} className="text-indigo-600 text-sm font-medium hover:underline">
-                  View All Top 20 →
+                  Смотреть весь топ-20 →
                 </button>
               </div>
               <div className="overflow-x-auto">
@@ -333,12 +333,12 @@ function App() {
                   <thead>
                     <tr className="text-left text-xs text-gray-500 uppercase border-b">
                       <th className="pb-3 pr-4">#</th>
-                      <th className="pb-3 pr-4">Company</th>
-                      <th className="pb-3 pr-4">Industry</th>
-                      <th className="pb-3 pr-4">City</th>
-                      <th className="pb-3 pr-4">Opp. Score</th>
-                      <th className="pb-3 pr-4">Priority</th>
-                      <th className="pb-3">Problem</th>
+                      <th className="pb-3 pr-4">Компания</th>
+                      <th className="pb-3 pr-4">Ниша</th>
+                      <th className="pb-3 pr-4">Город</th>
+                      <th className="pb-3 pr-4">Оценка</th>
+                      <th className="pb-3 pr-4">Приоритет</th>
+                      <th className="pb-3">Проблема</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -371,55 +371,55 @@ function App() {
             <div className="bg-white rounded-xl shadow-md p-6 border">
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-gray-500 uppercase">Search</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Поиск</label>
                   <input 
                     type="text" 
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Company, industry..."
+                    placeholder="Компания, ниша..."
                     className="w-full mt-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-500 uppercase">Priority</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Приоритет</label>
                   <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm">
-                    <option value="all">All</option>
+                    <option value="all">Все</option>
                     <option value="A+">A+</option>
                     <option value="A">A</option>
                     <option value="B">B</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-500 uppercase">Industry</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Ниша</label>
                   <select value={filterIndustry} onChange={e => setFilterIndustry(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm">
-                    <option value="all">All</option>
+                    <option value="all">Все</option>
                     {industries.map(i => <option key={i} value={i}>{i}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-500 uppercase">City</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Город</label>
                   <select value={filterCity} onChange={e => setFilterCity(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm">
-                    <option value="all">All</option>
+                    <option value="all">Все</option>
                     {cities.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-500 uppercase">Sort By</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Сортировка</label>
                   <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm">
-                    <option value="opportunityScore">Opportunity Score</option>
-                    <option value="websiteNeedScore">Website Need</option>
-                    <option value="salesPotential">Sales Potential</option>
-                    <option value="businessActivity">Business Activity</option>
+                    <option value="opportunityScore">Потенциал</option>
+                    <option value="websiteNeedScore">Потребность в сайте</option>
+                    <option value="salesPotential">Потенциал продаж</option>
+                    <option value="businessActivity">Активность бизнеса</option>
                   </select>
                 </div>
               </div>
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm text-gray-500">Found: <strong>{filteredLeads.length}</strong> leads</span>
+                <span className="text-sm text-gray-500">Найдено лидов: <strong>{filteredLeads.length}</strong></span>
                 <button 
                   onClick={() => exportCSV(filteredLeads, 'leads_export.csv')}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
                 >
-                  📥 Export CSV
+                  📥 Экспорт CSV
                 </button>
               </div>
             </div>
@@ -431,16 +431,16 @@ function App() {
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">
                       <th className="px-4 py-3">#</th>
-                      <th className="px-4 py-3">Company</th>
-                      <th className="px-4 py-3">Industry</th>
-                      <th className="px-4 py-3">City</th>
-                      <th className="px-4 py-3">Site Status</th>
-                      <th className="px-4 py-3">Opp. Score</th>
-                      <th className="px-4 py-3">Need</th>
-                      <th className="px-4 py-3">Sales</th>
-                      <th className="px-4 py-3">Activity</th>
-                      <th className="px-4 py-3">Priority</th>
-                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Компания</th>
+                      <th className="px-4 py-3">Ниша</th>
+                      <th className="px-4 py-3">Город</th>
+                      <th className="px-4 py-3">Сайт</th>
+                      <th className="px-4 py-3">Оценка</th>
+                      <th className="px-4 py-3">Потребность</th>
+                      <th className="px-4 py-3">Продажи</th>
+                      <th className="px-4 py-3">Активность</th>
+                      <th className="px-4 py-3">Приоритет</th>
+                      <th className="px-4 py-3">Статус</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -490,7 +490,7 @@ function App() {
               onClick={() => setSelectedLead(null)}
               className="text-indigo-600 font-medium hover:underline flex items-center gap-2"
             >
-              ← Back to list
+              ← Назад к списку
             </button>
             
             <div className="bg-white rounded-xl shadow-md p-8 border">
@@ -501,7 +501,7 @@ function App() {
                 </div>
                 <div className="flex gap-2">
                   <span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${getPriorityColor(selectedLead.priority)}`}>
-                    Priority: {selectedLead.priority}
+                    Приоритет: {selectedLead.priority}
                   </span>
                   <span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${getStatusColor(selectedLead.websiteStatus)}`}>
                     {selectedLead.websiteStatus}
@@ -511,33 +511,33 @@ function App() {
 
               {/* Scores */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <ScoreCard label="Opportunity Score" score={selectedLead.opportunityScore} />
-                <ScoreCard label="Website Need" score={selectedLead.websiteNeedScore} />
-                <ScoreCard label="Sales Potential" score={selectedLead.salesPotential} />
-                <ScoreCard label="Business Activity" score={selectedLead.businessActivity} />
+                <ScoreCard label="Потенциал" score={selectedLead.opportunityScore} />
+                <ScoreCard label="Потребность в сайте" score={selectedLead.websiteNeedScore} />
+                <ScoreCard label="Потенциал продаж" score={selectedLead.salesPotential} />
+                <ScoreCard label="Активность бизнеса" score={selectedLead.businessActivity} />
               </div>
 
               {/* Contacts */}
               <div className="grid md:grid-cols-2 gap-6 mb-8">
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-bold text-gray-700 mb-3">📞 Contacts</h4>
+                  <h4 className="font-bold text-gray-700 mb-3">📞 Контакты</h4>
                   <div className="space-y-2 text-sm">
-                    {selectedLead.phone && <div className="flex gap-2"><span className="text-gray-500 w-20">Phone:</span><span className="font-medium">{selectedLead.phone}</span></div>}
+                    {selectedLead.phone && <div className="flex gap-2"><span className="text-gray-500 w-20">Телефон:</span><span className="font-medium">{selectedLead.phone}</span></div>}
                     {selectedLead.email && <div className="flex gap-2"><span className="text-gray-500 w-20">Email:</span><span className="font-medium">{selectedLead.email}</span><span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${selectedLead.emailQuality === 'HIGH' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{selectedLead.emailQuality}</span></div>}
                     {selectedLead.whatsapp && <div className="flex gap-2"><span className="text-gray-500 w-20">WhatsApp:</span><span className="font-medium">{selectedLead.whatsapp}</span></div>}
                     {selectedLead.telegram && <div className="flex gap-2"><span className="text-gray-500 w-20">Telegram:</span><span className="font-medium">{selectedLead.telegram}</span></div>}
                     {selectedLead.vk && <div className="flex gap-2"><span className="text-gray-500 w-20">VK:</span><a href={selectedLead.vk} className="font-medium text-indigo-600 hover:underline">{selectedLead.vk}</a></div>}
-                    {selectedLead.website && <div className="flex gap-2"><span className="text-gray-500 w-20">Website:</span><a href={selectedLead.website} className="font-medium text-indigo-600 hover:underline">{selectedLead.website}</a></div>}
-                    <div className="flex gap-2"><span className="text-gray-500 w-20">Address:</span><span>{selectedLead.address}</span></div>
+                    {selectedLead.website && <div className="flex gap-2"><span className="text-gray-500 w-20">Сайт:</span><a href={selectedLead.website} className="font-medium text-indigo-600 hover:underline">{selectedLead.website}</a></div>}
+                    <div className="flex gap-2"><span className="text-gray-500 w-20">Адрес:</span><span>{selectedLead.address}</span></div>
                   </div>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-bold text-gray-700 mb-3">🔍 Analysis</h4>
+                  <h4 className="font-bold text-gray-700 mb-3">🔍 Анализ</h4>
                   <div className="space-y-2 text-sm">
-                    <div><span className="text-gray-500">Main Problem:</span><p className="font-medium mt-1">{selectedLead.mainProblem}</p></div>
-                    <div className="mt-3"><span className="text-gray-500">Sales Angle:</span><p className="font-medium mt-1">{selectedLead.salesAngle}</p></div>
-                    <div className="mt-3"><span className="text-gray-500">Verification:</span><span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${selectedLead.verification === 'HIGH' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{selectedLead.verification}</span></div>
-                    <div className="mt-3"><span className="text-gray-500">Source:</span><a href={selectedLead.source} className="ml-2 text-indigo-600 text-xs hover:underline">{selectedLead.source}</a></div>
+                    <div><span className="text-gray-500">Главная проблема:</span><p className="font-medium mt-1">{selectedLead.mainProblem}</p></div>
+                    <div className="mt-3"><span className="text-gray-500">Аргумент продажи:</span><p className="font-medium mt-1">{selectedLead.salesAngle}</p></div>
+                    <div className="mt-3"><span className="text-gray-500">Проверка:</span><span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${selectedLead.verification === 'HIGH' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{selectedLead.verification}</span></div>
+                    <div className="mt-3"><span className="text-gray-500">Источник:</span><a href={selectedLead.source} className="ml-2 text-indigo-600 text-xs hover:underline">{selectedLead.source}</a></div>
                   </div>
                 </div>
               </div>
@@ -550,14 +550,14 @@ function App() {
 
               {/* Suggested Improvement */}
               <div className="mb-6 bg-green-50 rounded-lg p-4 border border-green-100">
-                <h4 className="font-bold text-green-800 mb-2">🛠 Suggested Improvement</h4>
+                <h4 className="font-bold text-green-800 mb-2">🛠 Рекомендуемое улучшение</h4>
                 <p className="text-sm text-green-900">{selectedLead.suggestedImprovement}</p>
               </div>
 
               {/* Site Structure */}
               {selectedLead.siteStructure && (
                 <div className="mb-6 bg-purple-50 rounded-lg p-4 border border-purple-100">
-                  <h4 className="font-bold text-purple-800 mb-2">🏗️ Suggested Site Structure</h4>
+                  <h4 className="font-bold text-purple-800 mb-2">🏗️ Рекомендуемая структура сайта</h4>
                   <div className="flex flex-wrap gap-2">
                     {selectedLead.siteStructure.split(' → ').map((step, i) => (
                       <div key={i} className="flex items-center gap-2">
@@ -572,15 +572,15 @@ function App() {
               {/* Messages */}
               <div className="space-y-4">
                 <div className="bg-white border-2 border-indigo-200 rounded-lg p-4">
-                  <h4 className="font-bold text-indigo-800 mb-2">✉️ First Message</h4>
+                  <h4 className="font-bold text-indigo-800 mb-2">✉️ Первое сообщение</h4>
                   <p className="text-sm text-gray-700 italic">"{selectedLead.firstMessage}"</p>
                 </div>
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-bold text-gray-700 mb-2">📨 Follow-up 1</h4>
+                  <h4 className="font-bold text-gray-700 mb-2">📨 Повторное сообщение 1</h4>
                   <p className="text-sm text-gray-600 italic">"{selectedLead.followUp1}"</p>
                 </div>
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-bold text-gray-700 mb-2">📨 Follow-up 2</h4>
+                  <h4 className="font-bold text-gray-700 mb-2">📨 Повторное сообщение 2</h4>
                   <p className="text-sm text-gray-600 italic">"{selectedLead.followUp2}"</p>
                 </div>
               </div>
@@ -593,14 +593,14 @@ function App() {
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl shadow-md p-6 border border-amber-200">
               <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                🏆 TOP 20 High-Conversion Opportunities
+                🏆 Топ-20 самых перспективных возможностей
               </h2>
-              <p className="text-gray-600 mt-2">Самые перспективные компании для outreach. Отсортированы по Opportunity Score.</p>
+              <p className="text-gray-600 mt-2">Самые перспективные компании для контакта, отсортированные по потенциалу.</p>
               <button 
                 onClick={() => exportCSV(top20, 'leads_top20.csv')}
                 className="mt-4 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition"
               >
-                📥 Export Top 20 CSV
+                📥 Экспорт топ-20 в CSV
               </button>
             </div>
 
@@ -626,21 +626,21 @@ function App() {
                     </div>
                     <div className="text-right flex-shrink-0 ml-4">
                       <div className={`text-2xl font-bold ${getScoreColor(lead.opportunityScore)}`}>{lead.opportunityScore}</div>
-                      <div className="text-xs text-gray-500">Opportunity</div>
+                      <div className="text-xs text-gray-500">Потенциал</div>
                       <span className={`mt-2 inline-block px-2 py-1 rounded text-xs font-bold ${getPriorityColor(lead.priority)}`}>{lead.priority}</span>
                     </div>
                   </div>
                   <div className="mt-4 grid md:grid-cols-3 gap-4 pt-4 border-t">
                     <div>
-                      <span className="text-xs text-gray-500 uppercase font-medium">Main Problem</span>
+                      <span className="text-xs text-gray-500 uppercase font-medium">Главная проблема</span>
                       <p className="text-sm text-gray-700 mt-1">{lead.mainProblem}</p>
                     </div>
                     <div>
-                      <span className="text-xs text-gray-500 uppercase font-medium">Sales Angle</span>
+                      <span className="text-xs text-gray-500 uppercase font-medium">Аргумент продажи</span>
                       <p className="text-sm text-gray-700 mt-1">{lead.salesAngle}</p>
                     </div>
                     <div>
-                      <span className="text-xs text-gray-500 uppercase font-medium">Site Status</span>
+                      <span className="text-xs text-gray-500 uppercase font-medium">Состояние сайта</span>
                       <div className="mt-1">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(lead.websiteStatus)}`}>{lead.websiteStatus}</span>
                       </div>
@@ -656,18 +656,18 @@ function App() {
         {activeTab === 'report' && (
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-md p-8 border">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">📄 Lead Research Report</h2>
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">📄 Отчёт по исследованию лидов</h2>
               
               <div className="prose max-w-none">
                 <section className="mb-8">
-                  <h3 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Summary</h3>
+                  <h3 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Итоги</h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-sm"><strong>Total companies found:</strong> {stats.total}</p>
-                      <p className="text-sm"><strong>Rejected (score &lt; 60):</strong> {leads.filter(l => l.opportunityScore < 60).length}</p>
-                      <p className="text-sm"><strong>A+ priority:</strong> {stats.aPlus}</p>
-                      <p className="text-sm"><strong>A priority:</strong> {stats.a}</p>
-                      <p className="text-sm"><strong>B priority:</strong> {stats.b}</p>
+                  <p className="text-sm"><strong>Всего компаний:</strong> {stats.total}</p>
+                  <p className="text-sm"><strong>Отклонено (оценка &lt; 60):</strong> {leads.filter(l => l.opportunityScore < 60).length}</p>
+                  <p className="text-sm"><strong>Приоритет A+:</strong> {stats.aPlus}</p>
+                  <p className="text-sm"><strong>Приоритет A:</strong> {stats.a}</p>
+                  <p className="text-sm"><strong>Приоритет B:</strong> {stats.b}</p>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-4">
                       <p className="text-sm"><strong>Avg Opportunity Score:</strong> {stats.avgOpp}/100</p>
@@ -680,7 +680,7 @@ function App() {
                 </section>
 
                 <section className="mb-8">
-                  <h3 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Best Niches (by Opportunity Score)</h3>
+                  <h3 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Лучшие ниши по потенциалу</h3>
                   <div className="space-y-2">
                     {industryStats.sort((a, b) => b.avgScore - a.avgScore).map((ind, i) => (
                       <div key={ind.industry} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
@@ -695,7 +695,7 @@ function App() {
                 </section>
 
                 <section className="mb-8">
-                  <h3 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Best Cities</h3>
+                  <h3 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Лучшие города</h3>
                   <div className="space-y-2">
                     {cityStats.sort((a, b) => b.avgScore - a.avgScore).map((c, i) => (
                       <div key={c.city} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
@@ -709,7 +709,7 @@ function App() {
                 </section>
 
                 <section className="mb-8">
-                  <h3 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Most Common Website Problems</h3>
+                  <h3 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Частые проблемы сайтов</h3>
                   <div className="grid md:grid-cols-2 gap-3">
                     {[
                       { problem: 'No online booking/appointment', count: leads.filter(l => l.mainProblem.toLowerCase().includes('онлайн-запис') || l.mainProblem.toLowerCase().includes('online')).length },
