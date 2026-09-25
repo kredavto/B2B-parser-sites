@@ -44,15 +44,17 @@ type UploadedSite = {
   mainProblem?: string;
 };
 
-const normalizeColumn = (value: string) => value.toLowerCase().replace(/[\s_\-\.]/g, '');
+const normalizeColumn = (value: string) => value.replace(/^\uFEFF/, '').toLowerCase().replace(/[\s_\-\.]/g, '');
 const parseCsv = (text: string) => {
   const rows: string[][] = [];
+  const firstLine = text.split(/\r?\n/, 1)[0] ?? '';
+  const delimiter = (firstLine.match(/;/g)?.length ?? 0) >= (firstLine.match(/,/g)?.length ?? 0) ? ';' : ',';
   let row: string[] = [], cell = '', quoted = false;
   for (let i = 0; i < text.length; i += 1) {
     const char = text[i];
     if (char === '"') {
       if (quoted && text[i + 1] === '"') { cell += '"'; i += 1; } else quoted = !quoted;
-    } else if (char === ',' && !quoted) { row.push(cell.trim()); cell = ''; }
+    } else if ((char === delimiter || (delimiter === ';' && char === '\t')) && !quoted) { row.push(cell.trim()); cell = ''; }
     else if ((char === '\n' || char === '\r') && !quoted) {
       if (char === '\r' && text[i + 1] === '\n') i += 1;
       row.push(cell.trim()); cell = '';
@@ -407,8 +409,8 @@ function App() {
       const rows = parseCsv(await file.text());
       const sites = rows.map((row, index) => ({
         id: `${file.name}-${index}`,
-        company: firstField(row, ['company', 'name', 'companyname', 'компания', 'организация']) || `Компания ${index + 1}`,
-        website: normalizeSiteUrl(firstField(row, ['website', 'site', 'url', 'domain', 'сайт', 'ссылка', 'домен'])),
+        company: firstField(row, ['company', 'name', 'companyname', 'название', 'компания', 'организация']) || `Компания ${index + 1}`,
+        website: normalizeSiteUrl(firstField(row, ['website', 'site', 'url', 'domain', 'адресасайтов', 'адресасайта', 'сайт', 'ссылка', 'домен'])),
         city: firstField(row, ['city', 'город']),
         industry: firstField(row, ['industry', 'сфера', 'отрасль']),
         status: 'queued' as const,
