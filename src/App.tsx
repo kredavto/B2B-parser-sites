@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { leads as seedLeads, Lead } from './data/leads';
 
 const DEFAULT_FUNCTION_URL = 'https://udojokhtxodkxtoisbxi.supabase.co/functions/v1/parse-leads';
@@ -30,6 +30,51 @@ type SiteAudit = {
   seo: { score: number; checks: AuditCheck[] };
   geo: { score: number; checks: AuditCheck[] };
   technical: { https: boolean; hasViewport: boolean; h1Count: number; internalLinks: number; images: number; imagesWithoutAlt: number; hasSitemap: boolean; hasRobots: boolean };
+};
+
+type UploadedSite = {
+  id: string;
+  company: string;
+  website: string;
+  city: string;
+  industry: string;
+  status: 'queued' | 'analyzing' | 'completed';
+  score?: number;
+  httpStatus?: string;
+  mainProblem?: string;
+};
+
+const normalizeColumn = (value: string) => value.toLowerCase().replace(/[\s_\-\.]/g, '');
+const parseCsv = (text: string) => {
+  const rows: string[][] = [];
+  let row: string[] = [], cell = '', quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === '"') {
+      if (quoted && text[i + 1] === '"') { cell += '"'; i += 1; } else quoted = !quoted;
+    } else if (char === ',' && !quoted) { row.push(cell.trim()); cell = ''; }
+    else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && text[i + 1] === '\n') i += 1;
+      row.push(cell.trim()); cell = '';
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+    } else cell += char;
+  }
+  row.push(cell.trim());
+  if (row.some(Boolean)) rows.push(row);
+  const headers = (rows.shift() ?? []).map(normalizeColumn);
+  return rows.map(values => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ''])));
+};
+
+const firstField = (row: Record<string, string>, names: string[]) => {
+  const key = names.map(normalizeColumn).find(name => row[name]);
+  return key ? row[key].trim() : '';
+};
+
+const normalizeSiteUrl = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 };
 
 const getCompanyKey = (lead: Lead) => `${lead.company}|${lead.website}|${lead.phone}|${lead.city}`.toLowerCase();
@@ -156,6 +201,12 @@ function App() {
   const [auditRunning, setAuditRunning] = useState(false);
   const [auditError, setAuditError] = useState('');
   const [auditResult, setAuditResult] = useState<SiteAudit | null>(null);
+  const [uploadedSites, setUploadedSites] = useState<UploadedSite[]>([]);
+  const [uploadError, setUploadError] = useState('');
+  const [baseAuditRunning, setBaseAuditRunning] = useState(false);
+  const [baseAuditProgress, setBaseAuditProgress] = useState(0);
+  const [baseAuditSummary, setBaseAuditSummary] = useState('');
+  const baseInputRef = useRef<HTMLInputElement | null>(null);
   const [parsedCompanyKeys, setParsedCompanyKeys] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('parsedCompanyKeysV3');
@@ -342,6 +393,63 @@ function App() {
     }
   };
 
+  const handleBaseUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setUploadError('');
+    setBaseAuditSummary('');
+    if (!/\.(csv|txt)$/i.test(file.name)) {
+      setUploadError('Загрузите CSV или TXT-файл. Для Excel сохраните таблицу в формате CSV.');
+      return;
+    }
+    try {
+      const rows = parseCsv(await file.text());
+      const sites = rows.map((row, index) => ({
+        id: `${file.name}-${index}`,
+        company: firstField(row, ['company', 'name', 'companyname', 'компания', 'организация']) || `Компания ${index + 1}`,
+        website: normalizeSiteUrl(firstField(row, ['website', 'site', 'url', 'domain', 'сайт', 'ссылка', 'домен'])),
+        city: firstField(row, ['city', 'город']),
+        industry: firstField(row, ['industry', 'сфера', 'отрасль']),
+        status: 'queued' as const,
+      })).filter(site => site.website).slice(0, 100000);
+      if (!sites.length) throw new Error('В файле не найден столбец с адресами сайтов.');
+      setUploadedSites(sites);
+      if (rows.length > 100000) setUploadError('Загружены первые 100 000 строк — это максимальный размер базы.');
+    } catch (error) {
+      setUploadedSites([]);
+      setUploadError(error instanceof Error ? error.message : 'Не удалось прочитать базу.');
+    }
+  };
+
+  const analyzeUploadedSites = async () => {
+    if (baseAuditRunning || !uploadedSites.length) return;
+    setBaseAuditRunning(true);
+    setBaseAuditProgress(0);
+    setBaseAuditSummary('');
+    const results = [...uploadedSites];
+    let reachable = 0;
+    for (let index = 0; index < results.length; index += 1) {
+      results[index] = { ...results[index], status: 'analyzing' };
+      setUploadedSites([...results]);
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 7000);
+      try {
+        const response = await fetch(results[index].website, { method: 'HEAD', mode: 'cors', signal: controller.signal });
+        reachable += response.ok ? 1 : 0;
+        results[index] = { ...results[index], status: 'completed', score: response.ok ? 75 : 35, httpStatus: `HTTP ${response.status}`, mainProblem: response.ok ? 'Нужен расширенный аудит контента и конверсии' : 'Сайт вернул ошибку HTTP' };
+      } catch {
+        results[index] = { ...results[index], status: 'completed', score: 50, httpStatus: 'CORS/недоступен', mainProblem: 'Проверка контента ограничена браузером; нужен server-side аудит' };
+      } finally {
+        window.clearTimeout(timeout);
+      }
+      setUploadedSites([...results]);
+      setBaseAuditProgress(Math.round(((index + 1) / results.length) * 100));
+    }
+    setBaseAuditSummary(`Проверено сайтов: ${results.length}. Доступны напрямую: ${reachable}.`);
+    setBaseAuditRunning(false);
+  };
+
   const exportCSV = (data: Lead[], filename: string) => {
     const headers = ['ID','Company','Industry','City','Website','Website Status','Phone','Email','WhatsApp','Telegram','VK','Address','Source','Website Need Score','Sales Potential','Business Activity','Opportunity Score','Priority','Main Problem','Why This Lead','Suggested Improvement','First Message','Follow-up 1','Follow-up 2','Verification Date','Lead Status'];
     const rows = data.map(l => [
@@ -409,6 +517,13 @@ function App() {
               <div className="text-sm text-indigo-200">Поиск → проверка → аудит → скоринг → экспорт</div>
             </div>
             <div className="flex flex-wrap gap-2">
+              <input ref={baseInputRef} type="file" accept=".csv,.txt,text/csv,text/plain" className="hidden" onChange={handleBaseUpload} />
+              <button onClick={() => baseInputRef.current?.click()} className="rounded-lg bg-white px-4 py-2.5 font-semibold text-indigo-900 shadow-lg hover:bg-indigo-50">
+                📥 Загрузить базу
+              </button>
+              {uploadedSites.length > 0 && <button onClick={analyzeUploadedSites} disabled={baseAuditRunning} className="rounded-lg bg-amber-300 px-4 py-2.5 font-semibold text-amber-950 shadow-lg hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60">
+                🔬 Анализировать сайты ({uploadedSites.length})
+              </button>}
               <button onClick={() => { setParserResult(null); setIsParserOpen(true); }} className="rounded-lg bg-emerald-400 px-4 py-2.5 font-semibold text-emerald-950 shadow-lg hover:bg-emerald-300">
                 🚀 Новый парсинг
               </button>
@@ -417,6 +532,18 @@ function App() {
               </button>
             </div>
           </div>
+
+          {uploadedSites.length > 0 && <div className="mt-3 rounded-xl border border-white/15 bg-white/10 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span><strong>База загружена:</strong> {uploadedSites.length.toLocaleString('ru-RU')} сайтов</span>
+              <span>{baseAuditRunning ? `Анализ: ${baseAuditProgress}%` : baseAuditSummary || 'Готово к анализу'}</span>
+            </div>
+            {baseAuditRunning && <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/20"><div className="h-full bg-amber-300 transition-all" style={{ width: `${baseAuditProgress}%` }} /></div>}
+            {!baseAuditRunning && uploadedSites.some(site => site.status === 'completed') && <div className="mt-3 max-h-48 overflow-auto rounded-lg bg-black/10 text-xs">
+              {uploadedSites.slice(0, 100).map(site => <div key={site.id} className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 last:border-0"><span className="truncate">{site.company} · {site.website}</span><span className="shrink-0">{site.score}/100 · {site.httpStatus}</span></div>)}
+            </div>}
+          </div>}
+          {uploadError && <div className="mt-3 rounded-lg border border-red-300/30 bg-red-500/20 px-4 py-3 text-sm text-red-100">{uploadError}</div>}
           
           {/* Navigation */}
           <nav className="mt-6 flex gap-1">
