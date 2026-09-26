@@ -431,22 +431,39 @@ function App() {
     setBaseAuditSummary('');
     const results = [...uploadedSites];
     let reachable = 0;
-    for (let index = 0; index < results.length; index += 1) {
+    // Сайты нельзя проверять из браузера: их CORS-политика блокирует HEAD/GET,
+    // хотя сам сайт может быть полностью доступен. Используем тот же server-side
+    // аудит, что и кнопка «Аудит сайта», и ограничиваем число одновременных запросов.
+    const concurrency = 6;
+    let completed = 0;
+    const auditOne = async (index: number) => {
       results[index] = { ...results[index], status: 'analyzing' };
       setUploadedSites([...results]);
       const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), 7000);
+      const timeout = window.setTimeout(() => controller.abort(), 30000);
       try {
-        const response = await fetch(results[index].website, { method: 'HEAD', mode: 'cors', signal: controller.signal });
-        reachable += response.ok ? 1 : 0;
-        results[index] = { ...results[index], status: 'completed', score: response.ok ? 75 : 35, httpStatus: `HTTP ${response.status}`, mainProblem: response.ok ? 'Нужен расширенный аудит контента и конверсии' : 'Сайт вернул ошибку HTTP' };
-      } catch {
-        results[index] = { ...results[index], status: 'completed', score: 50, httpStatus: 'CORS/недоступен', mainProblem: 'Проверка контента ограничена браузером; нужен server-side аудит' };
+        const response = await fetch(backendUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: backendKey, Authorization: `Bearer ${backendKey}` },
+          body: JSON.stringify({ action: 'audit', url: results[index].website }),
+          signal: controller.signal,
+        });
+        const audit = await response.json() as { status?: number; opportunityScore?: number; mainProblem?: string; error?: string };
+        if (!response.ok || audit.error) throw new Error(audit.error || `HTTP ${response.status}`);
+        const status = Number(audit.status) || 200;
+        reachable += status < 400 ? 1 : 0;
+        results[index] = { ...results[index], status: 'completed', score: Number(audit.opportunityScore) || 50, httpStatus: `HTTP ${status}`, mainProblem: audit.mainProblem || (status < 400 ? 'Нужен расширенный аудит контента и конверсии' : 'Сайт вернул ошибку HTTP') };
+      } catch (error) {
+        results[index] = { ...results[index], status: 'completed', score: 50, httpStatus: 'Аудит недоступен', mainProblem: error instanceof Error && error.name === 'AbortError' ? 'Серверный аудит превысил лимит времени' : 'Не удалось получить server-side аудит' };
       } finally {
         window.clearTimeout(timeout);
+        completed += 1;
+        setUploadedSites([...results]);
+        setBaseAuditProgress(Math.round((completed / results.length) * 100));
       }
-      setUploadedSites([...results]);
-      setBaseAuditProgress(Math.round(((index + 1) / results.length) * 100));
+    };
+    for (let start = 0; start < results.length; start += concurrency) {
+      await Promise.all(Array.from({ length: Math.min(concurrency, results.length - start) }, (_, offset) => auditOne(start + offset)));
     }
     setBaseAuditSummary(`Проверено сайтов: ${results.length}. Доступны напрямую: ${reachable}.`);
     setBaseAuditRunning(false);
