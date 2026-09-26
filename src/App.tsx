@@ -449,29 +449,42 @@ function App() {
     // Сайты нельзя проверять из браузера: их CORS-политика блокирует HEAD/GET,
     // хотя сам сайт может быть полностью доступен. Используем тот же server-side
     // аудит, что и кнопка «Аудит сайта», и ограничиваем число одновременных запросов.
-    const concurrency = 6;
+    // Supabase Edge Functions and some hosting providers throttle bursts.
+    // A small worker pool plus retries prevents a transient 429/5xx/timeout
+    // from being shown as a permanently unavailable site.
+    const concurrency = 3;
+    const sleep = (ms: number) => new Promise(resolve => window.setTimeout(resolve, ms));
     let completed = 0;
     const auditOne = async (index: number) => {
       results[index] = { ...results[index], status: 'analyzing' };
       setUploadedSites([...results]);
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), 30000);
       try {
-        const response = await fetch(backendUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', apikey: backendKey, Authorization: `Bearer ${backendKey}` },
-          body: JSON.stringify({ action: 'audit', url: results[index].website }),
-          signal: controller.signal,
-        });
-        const audit = await response.json() as { status?: number; opportunityScore?: number; mainProblem?: string; error?: string };
-        if (!response.ok || audit.error) throw new Error(audit.error || `HTTP ${response.status}`);
-        const status = Number(audit.status) || 200;
-        reachable += status < 400 ? 1 : 0;
-        results[index] = { ...results[index], status: 'completed', score: Number(audit.opportunityScore) || 50, httpStatus: `HTTP ${status}`, mainProblem: audit.mainProblem || (status < 400 ? 'Нужен расширенный аудит контента и конверсии' : 'Сайт вернул ошибку HTTP') };
-      } catch (error) {
-        results[index] = { ...results[index], status: 'completed', score: 50, httpStatus: 'Аудит недоступен', mainProblem: error instanceof Error && error.name === 'AbortError' ? 'Серверный аудит превысил лимит времени' : 'Не удалось получить server-side аудит' };
+        let lastError = '';
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const controller = new AbortController();
+          const timeout = window.setTimeout(() => controller.abort(), 45000);
+          try {
+            const response = await fetch(backendUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', apikey: backendKey, Authorization: `Bearer ${backendKey}` },
+              body: JSON.stringify({ action: 'audit', url: results[index].website }),
+              signal: controller.signal,
+            });
+            const audit = await response.json() as { status?: number; opportunityScore?: number; mainProblem?: string; error?: string };
+            if (!response.ok || audit.error) throw new Error(audit.error || `HTTP ${response.status}`);
+            const status = Number(audit.status) || 200;
+            reachable += status < 400 ? 1 : 0;
+            results[index] = { ...results[index], status: 'completed', score: Number(audit.opportunityScore) || 50, httpStatus: `HTTP ${status}`, mainProblem: audit.mainProblem || (status < 400 ? 'Нужен расширенный аудит контента и конверсии' : 'Сайт вернул ошибку HTTP') };
+            return;
+          } catch (error) {
+            lastError = error instanceof Error && error.name === 'AbortError' ? 'Серверный аудит превысил лимит времени' : (error instanceof Error ? error.message : 'Ошибка запроса');
+            if (attempt < 2) await sleep(750 * 2 ** attempt);
+          } finally {
+            window.clearTimeout(timeout);
+          }
+        }
+        results[index] = { ...results[index], status: 'completed', score: 50, httpStatus: 'Аудит недоступен после 3 попыток', mainProblem: lastError || 'Не удалось получить server-side аудит' };
       } finally {
-        window.clearTimeout(timeout);
         completed += 1;
         setUploadedSites([...results]);
         setBaseAuditProgress(Math.round((completed / results.length) * 100));
