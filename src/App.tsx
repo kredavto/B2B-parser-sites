@@ -45,6 +45,14 @@ type UploadedSite = {
 };
 
 const normalizeColumn = (value: string) => value.replace(/^\uFEFF/, '').toLowerCase().replace(/[\s_\-\.]/g, '');
+const decodeUploadedFile = async (file: File) => {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (bytes[0] === 0xFF && bytes[1] === 0xFE) return new TextDecoder('utf-16le').decode(bytes);
+  if (bytes[0] === 0xFE && bytes[1] === 0xFF) return new TextDecoder('utf-16be').decode(bytes);
+  // CSV exported by older Russian Excel versions is commonly Windows-1251.
+  const utf8 = new TextDecoder('utf-8').decode(bytes);
+  return utf8.includes('\uFFFD') ? new TextDecoder('windows-1251').decode(bytes) : utf8;
+};
 const parseCsv = (text: string) => {
   const rows: string[][] = [];
   const firstLine = text.split(/\r?\n/, 1)[0] ?? '';
@@ -70,7 +78,14 @@ const parseCsv = (text: string) => {
 
 const firstField = (row: Record<string, string>, names: string[]) => {
   const key = names.map(normalizeColumn).find(name => row[name]);
-  return key ? row[key].trim() : '';
+  if (key) return row[key].trim();
+  // Accept real-world headers such as «URL сайта», «Сайт компании», «Web address»
+  // without accidentally selecting a company name or an email column.
+  const heuristic = Object.entries(row).find(([header, value]) => {
+    const normalized = normalizeColumn(header);
+    return Boolean(value?.trim()) && /(?:сайт|website|web|url|домен|domain|адрес)/i.test(normalized) && !/email|почт|телефон|phone|адресорганизаци/i.test(normalized);
+  });
+  return heuristic?.[1].trim() || '';
 };
 
 const normalizeSiteUrl = (value: string) => {
@@ -406,7 +421,7 @@ function App() {
       return;
     }
     try {
-      const rows = parseCsv(await file.text());
+      const rows = parseCsv(await decodeUploadedFile(file));
       const sites = rows.map((row, index) => ({
         id: `${file.name}-${index}`,
         company: firstField(row, ['company', 'name', 'companyname', 'название', 'компания', 'организация']) || `Компания ${index + 1}`,
