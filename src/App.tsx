@@ -497,6 +497,20 @@ function App() {
     setBaseAuditRunning(false);
   };
 
+  const exportUploadedAuditCsv = () => {
+    if (!uploadedSites.length || uploadedSites.some(site => site.status !== 'completed')) return;
+    const headers = ['Компания', 'URL', 'Статус', 'Оценка', 'HTTP/аудит', 'Основная проблема'];
+    const rows = uploadedSites.map(site => [site.company, site.website, site.status, site.score ?? '', site.httpStatus ?? '', site.mainProblem ?? '']);
+    const csv = [headers, ...rows].map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `site-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportCSV = (data: Lead[], filename: string) => {
     const headers = ['ID','Company','Industry','City','Website','Website Status','Phone','Email','WhatsApp','Telegram','VK','Address','Source','Website Need Score','Sales Potential','Business Activity','Opportunity Score','Priority','Main Problem','Why This Lead','Suggested Improvement','First Message','Follow-up 1','Follow-up 2','Verification Date','Lead Status'];
     const rows = data.map(l => [
@@ -570,6 +584,9 @@ function App() {
               </button>
               {uploadedSites.length > 0 && <button onClick={analyzeUploadedSites} disabled={baseAuditRunning} className="rounded-lg bg-amber-300 px-4 py-2.5 font-semibold text-amber-950 shadow-lg hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60">
                 🔬 Анализировать сайты ({uploadedSites.length})
+              </button>}
+              {uploadedSites.length > 0 && <button onClick={exportUploadedAuditCsv} disabled={baseAuditRunning || uploadedSites.some(site => site.status !== 'completed')} className="rounded-lg bg-white/90 px-4 py-2.5 font-semibold text-indigo-900 shadow-lg hover:bg-white disabled:cursor-not-allowed disabled:opacity-50" title="Сначала завершите анализ базы">
+                📤 Скачать результаты CSV
               </button>}
               <button onClick={() => { setParserResult(null); setIsParserOpen(true); }} className="rounded-lg bg-emerald-400 px-4 py-2.5 font-semibold text-emerald-950 shadow-lg hover:bg-emerald-300">
                 🚀 Новый парсинг

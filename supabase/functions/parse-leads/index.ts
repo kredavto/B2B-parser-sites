@@ -179,7 +179,27 @@ async function auditSite(rawUrl: string) {
   if (url.length > 500 || !isPublicHttpUrl(url)) throw new Error('Укажите публичный URL сайта с протоколом http или https');
   const started = Date.now();
   const parsedUrl = new URL(url);
-  const { response, text: html } = await fetchText(url, 12000);
+  const candidates = [url];
+  const alternateProtocol = parsedUrl.protocol === 'https:' ? 'http:' : 'https:';
+  candidates.push(`${alternateProtocol}//${parsedUrl.host}${parsedUrl.pathname}${parsedUrl.search}`);
+  if (!parsedUrl.hostname.startsWith('www.')) {
+    candidates.push(`${parsedUrl.protocol}//www.${parsedUrl.host}${parsedUrl.pathname}${parsedUrl.search}`);
+    candidates.push(`${alternateProtocol}//www.${parsedUrl.host}${parsedUrl.pathname}${parsedUrl.search}`);
+  }
+  let response: Response | undefined;
+  let html = '';
+  let lastError: unknown;
+  for (const candidate of [...new Set(candidates)]) {
+    try {
+      const result = await fetchText(candidate, 12000);
+      response = result.response;
+      html = result.text;
+      break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (!response) throw lastError instanceof Error ? lastError : new Error('Сайт не ответил по доступным адресам');
   const finalUrl = response.url || url;
   const limitedHtml = html.slice(0, 2_000_000);
   const lower = limitedHtml.toLowerCase();
