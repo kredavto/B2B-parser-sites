@@ -91,7 +91,12 @@ const firstField = (row: Record<string, string>, names: string[]) => {
 const normalizeSiteUrl = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return '';
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  // Экспортированные базы часто содержат несколько ссылок в одной ячейке
+  // (сайт, Telegram, Jivo и т. п.). Для аудита берём первый полноценный URL.
+  const explicit = trimmed.match(/https?:\/\/[^\s,;|]+/i)?.[0];
+  const candidate = (explicit || trimmed.split(/[;,|]/)[0]).trim().replace(/[\])}>\.]+$/, '');
+  if (!candidate) return '';
+  return /^https?:\/\//i.test(candidate) ? candidate : `https://${candidate}`;
 };
 
 const getCompanyKey = (lead: Lead) => `${lead.company}|${lead.website}|${lead.phone}|${lead.city}`.toLowerCase();
