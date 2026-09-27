@@ -579,7 +579,7 @@ function App() {
             </div>
             <div className="flex flex-wrap gap-2">
               <input ref={baseInputRef} type="file" accept=".csv,.txt,text/csv,text/plain" className="hidden" onChange={handleBaseUpload} />
-              <button onClick={() => baseInputRef.current?.click()} className="rounded-lg bg-white px-4 py-2.5 font-semibold text-indigo-900 shadow-lg hover:bg-indigo-50">
+              <button type="button" aria-label="Загрузить базу сайтов" onClick={() => baseInputRef.current?.click()} className="rounded-lg bg-white px-4 py-2.5 font-semibold text-indigo-900 shadow-lg hover:bg-indigo-50">
                 📥 Загрузить базу
               </button>
               {uploadedSites.length > 0 && <button onClick={analyzeUploadedSites} disabled={baseAuditRunning} className="rounded-lg bg-amber-300 px-4 py-2.5 font-semibold text-amber-950 shadow-lg hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60">
